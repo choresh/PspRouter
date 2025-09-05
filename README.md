@@ -41,10 +41,10 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 ## 🏗 Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+┌─────────────────┐    ┌──────────────────┐     ┌─────────────────┐
 │   Transaction   │───▶│   PSP Router     │───▶│   Decision      │
-│   Input         │    │                  │    │   Output        │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+│   Input         │    │                  │     │   Output        │
+└─────────────────┘    └──────────────────┘     └─────────────────┘
                               │
                               ▼
                     ┌──────────────────┐
@@ -537,6 +537,311 @@ For questions and support:
 - Check the troubleshooting section
 - Review the logs for error details
 - Check the documentation
+
+---
+
+## 📚 Appendix: Bandit Learning Deep Dive
+
+### A.1 Understanding Multi-Armed Bandits
+
+#### What is a Multi-Armed Bandit?
+A multi-armed bandit is a machine learning problem where an agent must choose between multiple actions (arms) to maximize cumulative reward over time. The name comes from slot machines (one-armed bandits) - imagine choosing between multiple slot machines to maximize winnings.
+
+#### Key Concepts
+- **Arms**: Available choices (in our case: Adyen, Stripe, Klarna, PayPal)
+- **Reward**: Outcome of choosing an arm (authorization success, fee optimization)
+- **Exploration vs Exploitation**: Balance between trying new arms vs using known good arms
+- **Regret**: Difference between optimal choice and actual choice
+
+### A.2 Bandit Algorithms Explained
+
+#### Epsilon-Greedy Algorithm
+```csharp
+// Simple epsilon-greedy logic
+if (random < epsilon)
+    return random_arm();  // Explore (10% of time)
+else
+    return best_known_arm();  // Exploit (90% of time)
+```
+
+**How it works:**
+- **Exploration (ε%)**: Randomly try different PSPs to learn
+- **Exploitation (1-ε%)**: Use the PSP with highest success rate
+- **Learning**: Update success rates after each transaction
+
+**Example:**
+```
+ε = 0.1 (10% exploration)
+- 90% of time: Choose Adyen (best known)
+- 10% of time: Randomly try Stripe/Klarna/PayPal
+```
+
+#### Thompson Sampling Algorithm
+```csharp
+// Bayesian approach
+for each arm:
+    sample = beta_distribution(alpha, beta)
+    if sample > best_sample:
+        best_arm = arm
+return best_arm
+```
+
+**How it works:**
+- **Bayesian**: Uses probability distributions instead of averages
+- **Uncertainty**: Naturally balances exploration/exploitation based on confidence
+- **Adaptive**: More exploration when uncertain, less when confident
+
+### A.3 Contextual Bandits: The Game Changer
+
+#### Traditional vs Contextual Bandits
+
+**Traditional Bandit:**
+```
+Segment: "US_USD_Visa"
+Decision: Always choose Adyen (89% success rate)
+```
+
+**Contextual Bandit:**
+```
+Segment: "US_USD_Visa"
+Context: {amount: 500, risk: 30, sca: true}
+Decision: Choose Stripe (better for high-risk SCA transactions)
+```
+
+#### Context Feature Engineering
+
+Our implementation extracts features from transaction context:
+
+```csharp
+// Transaction context
+var context = {
+    "amount": 150.00m,      // → 150.0
+    "risk_score": 25,       // → 25.0
+    "sca_required": true,   // → 1.0
+    "currency": "USD",      // → 0.123 (hash-based)
+    "merchant_tier": "premium" // → 0.456 (hash-based)
+};
+
+// Extracted features
+var features = {
+    "amount": 150.0,
+    "risk_score": 25.0,
+    "sca_required": 1.0,
+    "currency": 0.123,
+    "merchant_tier": 0.456
+};
+```
+
+#### Contextual Scoring Algorithm
+
+```csharp
+score = base_success_rate + contextual_bonus
+
+// Base success rate
+base_success_rate = total_rewards / total_attempts
+
+// Contextual bonus
+contextual_bonus = Σ(similarity * 0.1)
+similarity = 1.0 - |context_value - arm_learned_value|
+```
+
+**Example Calculation:**
+```
+Adyen for "US_USD_Visa":
+- Base rate: 0.89
+- Learned features: {amount: 200, risk: 20, sca: 0.3}
+- Current context: {amount: 150, risk: 25, sca: 1.0}
+
+Similarity calculations:
+- amount: 1.0 - |150-200|/max(150,200) = 0.75
+- risk: 1.0 - |25-20|/max(25,20) = 0.8
+- sca: 1.0 - |1.0-0.3| = 0.3
+
+Contextual bonus: (0.75 + 0.8 + 0.3) * 0.1 = 0.185
+Final score: 0.89 + 0.185 = 1.075
+```
+
+### A.4 Learning Process Deep Dive
+
+#### 1. Initial State (Cold Start)
+```
+All PSPs start with no data:
+Adyen: {sum: 0, count: 0, features: {}}
+Stripe: {sum: 0, count: 0, features: {}}
+```
+
+#### 2. First Transactions (Exploration)
+```
+Transaction 1: $100, risk=10, sca=false
+→ Random selection: Adyen
+→ Outcome: Success (reward=1.0)
+→ Update: Adyen {sum: 1.0, count: 1, features: {amount: 100, risk: 10, sca: 0}}
+
+Transaction 2: $200, risk=30, sca=true  
+→ Random selection: Stripe
+→ Outcome: Success (reward=0.8) // Lower due to fees
+→ Update: Stripe {sum: 0.8, count: 1, features: {amount: 200, risk: 30, sca: 1}}
+```
+
+#### 3. Learning Phase (Exploitation with Exploration)
+```
+Transaction 3: $150, risk=20, sca=false
+→ Context: {amount: 150, risk: 20, sca: 0}
+→ Adyen score: 1.0 + similarity_bonus = 1.05
+→ Stripe score: 0.8 + similarity_bonus = 0.85
+→ Choose: Adyen (exploitation)
+```
+
+#### 4. Mature Learning (Smart Decisions)
+```
+After 1000+ transactions:
+Adyen: {sum: 850, count: 1000, features: {amount: 180, risk: 15, sca: 0.2}}
+Stripe: {sum: 780, count: 1000, features: {amount: 220, risk: 25, sca: 0.6}}
+
+Transaction: $300, risk=40, sca=true
+→ Context: {amount: 300, risk: 40, sca: 1}
+→ Adyen: 0.85 + low_similarity_bonus = 0.87
+→ Stripe: 0.78 + high_similarity_bonus = 0.92
+→ Choose: Stripe (contextual decision!)
+```
+
+### A.5 Reward Function Design
+
+#### Multi-Factor Reward Calculation
+```csharp
+reward = base_auth_reward - fee_penalty + speed_bonus - risk_penalty
+
+// Base reward
+base_auth_reward = authorized ? 1.0 : 0.0
+
+// Fee penalty (normalized)
+fee_penalty = fee_amount / transaction_amount
+
+// Speed bonus
+speed_bonus = processing_time < 1000ms ? 0.1 : 0.0
+
+// Risk penalty
+risk_penalty = risk_score > 50 ? 0.2 : 0.0
+
+// Clamp to [-1, 1]
+final_reward = max(-1.0, min(1.0, reward))
+```
+
+#### Example Reward Calculations
+```
+Transaction 1: $100, authorized=true, fee=$2.30, time=800ms, risk=20
+reward = 1.0 - 0.023 + 0.1 - 0.0 = 1.077 → 1.0
+
+Transaction 2: $100, authorized=false, fee=$0, time=2000ms, risk=60  
+reward = 0.0 - 0.0 + 0.0 - 0.2 = -0.2
+
+Transaction 3: $1000, authorized=true, fee=$20.30, time=1200ms, risk=30
+reward = 1.0 - 0.0203 + 0.0 - 0.0 = 0.9797
+```
+
+### A.6 Performance Characteristics
+
+#### Convergence Analysis
+```
+Transactions 1-100:    High exploration, learning patterns
+Transactions 100-500:  Balanced exploration/exploitation  
+Transactions 500+:     Mostly exploitation, fine-tuning
+```
+
+#### Memory Usage
+```
+Per segment: ~1KB (statistics + features)
+1000 segments: ~1MB total
+Features per arm: ~100 bytes
+```
+
+#### Computational Complexity
+```
+Selection: O(arms × features) = O(4 × 10) = O(40) operations
+Update: O(features) = O(10) operations
+Total: Very fast, suitable for real-time routing
+```
+
+### A.7 Advanced Features
+
+#### Feature Decay (Optional Enhancement)
+```csharp
+// Gradually forget old patterns
+foreach (feature in arm_features):
+    feature.value = feature.value * 0.99  // 1% decay per update
+```
+
+#### Segment Hierarchies (Optional Enhancement)
+```csharp
+// Learn at multiple levels
+Global: All transactions
+Country: US transactions  
+Currency: US USD transactions
+Scheme: US USD Visa transactions
+```
+
+#### Confidence Intervals (Optional Enhancement)
+```csharp
+// Track uncertainty
+confidence = 1.0 / sqrt(count)
+if confidence > threshold:
+    explore_more()
+```
+
+### A.8 Comparison with External Libraries
+
+#### VowpalWabbit Advantages
+- **Advanced algorithms**: LinUCB, Neural Bandits
+- **Feature interactions**: Automatic feature combinations
+- **Online learning**: Continuous model updates
+- **Industry proven**: Used by major companies
+
+#### Our Implementation Advantages  
+- **Customizable**: Easy to modify for PSP routing
+- **Lightweight**: No external dependencies
+- **Fast**: Optimized for our use case
+- **Debuggable**: Full control over algorithm
+
+#### When to Use Each
+```
+Use Our Implementation When:
+- Transaction volume < 1M/day
+- Simple feature interactions sufficient
+- Need full control over algorithm
+- Want minimal dependencies
+
+Use VowpalWabbit When:
+- Transaction volume > 1M/day  
+- Need advanced ML features
+- Complex feature interactions required
+- Want industry-standard algorithms
+```
+
+### A.9 Monitoring and Debugging
+
+#### Key Metrics to Track
+```csharp
+// Learning metrics
+exploration_rate = exploration_decisions / total_decisions
+convergence_rate = change_in_scores / time_period
+regret = optimal_reward - actual_reward
+
+// Performance metrics  
+auth_rate_by_psp = successes / attempts
+fee_optimization = total_fees_saved / total_volume
+decision_time = average_routing_time
+```
+
+#### Debugging Tools
+```csharp
+// Log bandit decisions
+logger.LogDebug("Bandit selected {PSP} with score {Score} for context {Context}", 
+    selectedPSP, score, context);
+
+// Track learning progress
+logger.LogInformation("Segment {Segment} learning: {Stats}", 
+    segmentKey, armStatistics);
+```
 
 ---
 
