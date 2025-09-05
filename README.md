@@ -1,8 +1,14 @@
-# 🚀 Enhanced PSP Router - Complete Implementation
+# 🚀 Enhanced PSP Router - Intelligent Payment Routing System
 
-## 🎯 Overview
+## 🎯 Purpose
+Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using **LLM-based decision making**, **multi-armed bandit learning**, and **vector memory**.
 
-The Enhanced PSP Router is a sophisticated payment service provider routing system that combines **LLM-based decision making**, **multi-armed bandit learning**, and **vector memory** to optimize payment routing decisions in real-time.
+## 🏗 Solution Overview
+- Deterministic **guardrails** (capabilities, SCA/3DS, health).
+- **LLM decision engine** with tool calling.
+- **Bandit learning** (ε-greedy / Thompson).
+- **pgvector memory** for "lessons learned."
+- Deterministic **fallback** scoring when LLM is unavailable.
 
 ## ✨ Key Features
 
@@ -52,6 +58,20 @@ The Enhanced PSP Router is a sophisticated payment service provider routing syst
             └─────────────┘    └─────────────┘
 ```
 
+## 📦 Project Layout
+- `Program.cs` – minimal runnable example wiring **OpenAIChatClient**, tools, **PgVectorMemory**, and **OpenAIEmbeddings**.
+- `Router.cs` – decision engine (LLM first, fallback on parse/errors).
+- `DTOs.cs` – contracts.
+- `Interfaces.cs` – abstractions for clients/providers/tools.
+- `Tools.cs` – `get_psp_health`, `get_fee_quote` tool wrappers.
+- `Bandit.cs` – `IBandit`, `EpsilonGreedyBandit`, `ThompsonSamplingBandit`.
+- `MemoryPgVector.cs` – `PgVectorMemory` (ensure schema, add/search).
+- `OpenAIChatClient.cs` – chat wrapper with `response_format=json_object` and tool-calling loop.
+- `EmbeddingsHelper.cs` – `OpenAIEmbeddings` helper (HTTP) for embeddings.
+- `CapabilityMatrix.cs` – method→PSP gating.
+- `Dummies.cs` – dummy providers for local testing.
+- `PspRouter.csproj` – .NET 8, refs: `Npgsql`, `Pgvector`.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -59,20 +79,102 @@ The Enhanced PSP Router is a sophisticated payment service provider routing syst
 - PostgreSQL with pgvector extension
 - OpenAI API key
 
-### Environment Setup
+### 1. Database Setup
+
+#### Install PostgreSQL with pgvector
 ```bash
-export OPENAI_API_KEY=sk-your-openai-key
+# Install PostgreSQL (Ubuntu/Debian)
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# Install pgvector extension
+sudo apt install postgresql-16-pgvector  # Adjust version as needed
+
+# Or using Docker
+docker run --name psp-router-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=psp_router -p 5432:5432 -d pgvector/pgvector:pg16
+```
+
+#### Create Database and Run Setup
+```sql
+-- Connect to PostgreSQL as superuser
+sudo -u postgres psql
+
+-- Create database
+CREATE DATABASE psp_router;
+
+-- Create user (optional)
+CREATE USER psp_router_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE psp_router TO psp_router_user;
+```
+
+```bash
+# Run the setup script
+psql -U postgres -d psp_router -f setup-database.sql
+```
+
+#### Verify Setup
+```sql
+-- Connect to the database
+psql -U postgres -d psp_router
+
+-- Check if vector extension is installed
+SELECT * FROM pg_extension WHERE extname = 'vector';
+
+-- Check if tables are created
+\dt
+
+-- Check sample data
+SELECT key, content FROM psp_lessons LIMIT 5;
+```
+
+### 2. Environment Configuration
+
+```bash
+# Windows (PowerShell)
+$env:OPENAI_API_KEY="sk-your-openai-key"
+$env:PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
+
+# Linux/Mac
+export OPENAI_API_KEY="sk-your-openai-key"
 export PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
 ```
 
-### Database Setup
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
+### 3. Run the Application
+
+```bash
+# Build the project
+dotnet build
+
+# Run the application
+dotnet run
 ```
 
-### Run the Application
-```bash
-dotnet run
+### Expected Output
+```
+=== Configuration ===
+✓ Database schema ensured
+✓ Components initialized
+
+--- Transaction 1 ---
+Merchant: M123, Amount: 120.00 USD, Method: Card
+Decision: Adyen
+Reasoning: LLM routing - Auth: 89.00%, Fee: 200bps + $0.30
+Method: LLM routing
+Outcome: ✓ Authorized - Fee: $2.70 - Time: 450ms
+✓ Lesson added to memory
+
+Top memory results:
+score=0.950 key=sample_1 meta_candidate=Adyen
+USD Visa transactions work well with Adyen for low-risk merchants
+---
+
+=== PSP Router Ready ===
+The enhanced PSP Router is now running with:
+• LLM-based intelligent routing
+• Multi-armed bandit learning
+• Vector memory for lessons
+• Comprehensive logging and monitoring
+• Real PostgreSQL database integration
 ```
 
 ## 📋 Usage Examples
@@ -87,11 +189,6 @@ var decision = await router.DecideAsync(context, cancellationToken);
 ```csharp
 var outcome = new TransactionOutcome(/* transaction results */);
 router.UpdateReward(decision, outcome);
-```
-
-### Enhanced Example
-```csharp
-await EnhancedExample.RunAsync(); // Demonstrates full learning cycle
 ```
 
 ## 🔧 Configuration
@@ -177,6 +274,25 @@ reward = baseAuthReward - feePenalty + speedBonus - riskPenalty
 
 ## 🚀 Production Deployment
 
+### Environment Variables for Production
+```bash
+# Production OpenAI API key
+export OPENAI_API_KEY="sk-prod-your-key"
+
+# Production database connection
+export PGVECTOR_CONNSTR="Host=prod-db-host;Username=psp_router;Password=secure-password;Database=psp_router;Port=5432;SSL Mode=Require"
+```
+
+### Database Security
+```sql
+-- Create production user with limited privileges
+CREATE USER psp_router_prod WITH PASSWORD 'secure_password';
+GRANT CONNECT ON DATABASE psp_router TO psp_router_prod;
+GRANT USAGE ON SCHEMA public TO psp_router_prod;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO psp_router_prod;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO psp_router_prod;
+```
+
 ### Scaling Considerations
 - **Horizontal Scaling**: Stateless design supports multiple instances
 - **Database Optimization**: Proper indexing for vector searches
@@ -231,6 +347,16 @@ private async Task<List<string>> GetRelevantLessonsAsync(RouteContext ctx, Cance
 CREATE INDEX CONCURRENTLY psp_lessons_embedding_idx 
 ON psp_lessons USING ivfflat (embedding vector_cosine_ops) 
 WITH (lists = 100);
+
+-- Analyze tables for better query planning
+ANALYZE psp_lessons;
+ANALYZE transaction_outcomes;
+```
+
+### Connection Pooling
+```csharp
+// In your connection string, add pooling parameters
+"Host=localhost;Username=postgres;Password=postgres;Database=psp_router;Pooling=true;MinPoolSize=5;MaxPoolSize=20"
 ```
 
 ## 🧪 Testing
@@ -286,6 +412,87 @@ Adds lesson to vector memory.
 #### `SearchAsync(float[], int, CancellationToken)`
 Searches vector memory for relevant lessons.
 
+## 🛠 Replace Dummies
+- Implement `IHealthProvider` and `IFeeQuoteProvider` with your metrics/config.
+- Swap in your own stats for `AuthRate30d` and pass them in `RouteContext`.
+
+## 🔧 Tuning
+- Adjust embedding model & `vector(N)` dimension in `MemoryPgVector.cs` to match your chosen model.
+- Configure model name in `OpenAIChatClient` (default: `gpt-4.1`).
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### 1. Database Connection Failed
+```
+Error: 3D000: database "psp_router" does not exist
+```
+**Solution**: Create the database using the setup script
+
+#### 2. Vector Extension Not Found
+```
+Error: extension "vector" does not exist
+```
+**Solution**: Install pgvector extension
+```bash
+sudo apt install postgresql-16-pgvector
+```
+
+#### 3. OpenAI API Key Invalid
+```
+Error: Invalid API key
+```
+**Solution**: Verify your API key and ensure it has sufficient credits
+
+#### 4. Permission Denied
+```
+Error: permission denied for table psp_lessons
+```
+**Solution**: Grant proper permissions to your database user
+
+### Debug Mode
+```bash
+# Enable debug logging
+export DOTNET_ENVIRONMENT=Development
+dotnet run
+```
+
+## 🔒 Security Considerations
+
+### 1. API Key Security
+- Never commit API keys to version control
+- Use environment variables or secure key management
+- Rotate keys regularly
+
+### 2. Database Security
+- Use strong passwords
+- Enable SSL connections in production
+- Restrict database access by IP
+- Regular security updates
+
+### 3. Network Security
+- Use VPN or private networks for database access
+- Implement rate limiting
+- Monitor for suspicious activity
+
+## 💾 Backup and Recovery
+
+### 1. Database Backup
+```bash
+# Create backup
+pg_dump -U postgres -h localhost psp_router > psp_router_backup.sql
+
+# Restore backup
+psql -U postgres -h localhost psp_router < psp_router_backup.sql
+```
+
+### 2. Automated Backups
+```bash
+# Add to crontab for daily backups
+0 2 * * * pg_dump -U postgres psp_router | gzip > /backups/psp_router_$(date +\%Y\%m\%d).sql.gz
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -302,8 +509,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For questions and support:
 - Create an issue in the repository
+- Check the troubleshooting section
+- Review the logs for error details
 - Check the documentation
-- Review the example implementations
 
 ---
 
