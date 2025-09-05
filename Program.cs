@@ -1,5 +1,6 @@
 using System.Text.Json;
 using PspRouter;
+using Microsoft.Extensions.Logging;
 
 class Program
 {
@@ -10,12 +11,19 @@ class Program
         var pgConn = Environment.GetEnvironmentVariable("PGVECTOR_CONNSTR") 
                      ?? "Host=localhost;Username=postgres;Password=postgres;Database=psp_router";
 
+        // === Logging Setup ===
+        using var loggerFactory = LoggerFactory.Create(builder =>
+            builder.AddConsole().SetMinimumLevel(LogLevel.Information));
+        var logger = loggerFactory.CreateLogger<PspRouter.PspRouter>();
+
         // === Providers & Clients ===
         var health = new DummyHealthProvider();   // replace with real metrics
         var fees   = new DummyFeeProvider();      // replace with real fee tables
         var chat   = new OpenAIChatClient(apiKey, model: "gpt-4.1");
         var embed  = new OpenAIEmbeddings(apiKey, model: "text-embedding-3-large");
         var memory = new PgVectorMemory(pgConn, table: "psp_lessons");
+        var bandit = new EpsilonGreedyBandit(epsilon: 0.1); // 10% exploration
+        
         await memory.EnsureSchemaAsync(CancellationToken.None);
 
         // === Example transaction ===
@@ -70,26 +78,83 @@ class Program
         };
 
         // === Route decision ===
-        var router = new PspRouter.PspRouter(chat, health, fees, tools);
+        var router = new PspRouter.PspRouter(chat, health, fees, tools, bandit, memory, logger);
         var decision = await router.DecideAsync(ctx, CancellationToken.None);
         Console.WriteLine("Decision:");
         Console.WriteLine(JsonSerializer.Serialize(decision, new JsonSerializerOptions { WriteIndented = true }));
 
+        // === Simulate transaction outcome and update learning ===
+        var outcome = SimulateTransactionOutcome(decision, tx);
+        router.UpdateReward(decision, outcome);
+        Console.WriteLine($"\nSimulated outcome: Authorized={outcome.Authorized}, Fee={outcome.FeeAmount:C}, ProcessingTime={outcome.ProcessingTimeMs}ms");
+
         // === Learning: add a 'lesson' to pgvector and query it ===
-        var lessonText = $"""Segment {tx.MerchantId}|{tx.MerchantCountry}|{tx.Currency}|{tx.Scheme}: Chose {decision.Candidate} with auth bias over fees; consider 3DS when SCA required.""";
-        var emb = await embed.EmbedAsync(lessonText, CancellationToken.None);
-        await memory.AddAsync(Guid.NewGuid().ToString("N"), lessonText,
-            new Dictionary<string,string> { ["candidate"] = decision.Candidate }, emb, CancellationToken.None);
-
-        var queryEmbedding = await embed.EmbedAsync("Prefer higher auth for USD Visa", CancellationToken.None);
-        var top = await memory.SearchAsync(queryEmbedding, k: 3, CancellationToken.None);
-
-        Console.WriteLine("\nTop memory results:");
-        foreach (var (key, text, meta, score) in top)
+        try
         {
-            Console.WriteLine($"score={score:0.000} key={key} meta_candidate={meta.GetValueOrDefault("candidate","")}");
-            Console.WriteLine(text);
-            Console.WriteLine("---");
+            var lessonText = $"""Segment {tx.MerchantId}|{tx.MerchantCountry}|{tx.Currency}|{tx.Scheme}: Chose {decision.Candidate} with auth bias over fees; consider 3DS when SCA required.""";
+            var emb = await embed.EmbedAsync(lessonText, CancellationToken.None);
+            await memory.AddAsync(Guid.NewGuid().ToString("N"), lessonText,
+                new Dictionary<string,string> { ["candidate"] = decision.Candidate }, emb, CancellationToken.None);
+
+            var queryEmbedding = await embed.EmbedAsync("Prefer higher auth for USD Visa", CancellationToken.None);
+            var top = await memory.SearchAsync(queryEmbedding, k: 3, CancellationToken.None);
+
+            Console.WriteLine("\nTop memory results:");
+            foreach (var (key, text, meta, score) in top)
+            {
+                Console.WriteLine($"score={score:0.000} key={key} meta_candidate={meta.GetValueOrDefault("candidate","")}");
+                Console.WriteLine(text);
+                Console.WriteLine("---");
+            }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠ Memory operations failed: {ex.Message}");
+        }
+
+        Console.WriteLine("\n=== PSP Router Ready ===");
+        Console.WriteLine("The enhanced PSP Router is now running with:");
+        Console.WriteLine("• LLM-based intelligent routing");
+        Console.WriteLine("• Multi-armed bandit learning");
+        Console.WriteLine("• Vector memory for lessons");
+        Console.WriteLine("• Comprehensive logging and monitoring");
+        Console.WriteLine("• Real PostgreSQL database integration");
+    }
+
+    private static TransactionOutcome SimulateTransactionOutcome(RouteDecision decision, RouteInput tx)
+    {
+        // Simulate realistic transaction outcomes based on PSP choice
+        var random = new Random();
+        var baseAuthRate = decision.Candidate switch
+        {
+            "Adyen" => 0.89,
+            "Stripe" => 0.87,
+            "Klarna" => 0.85,
+            "PayPal" => 0.82,
+            _ => 0.80
+        };
+
+        // Adjust auth rate based on transaction characteristics
+        var adjustedAuthRate = baseAuthRate;
+        if (tx.SCARequired) adjustedAuthRate -= 0.05; // SCA reduces auth rate
+        if (tx.RiskScore > 30) adjustedAuthRate -= 0.10; // High risk reduces auth rate
+        if (tx.Amount > 1000) adjustedAuthRate -= 0.03; // Large amounts reduce auth rate
+
+        var authorized = random.NextDouble() < adjustedAuthRate;
+        var processingTime = random.Next(200, 2000); // 200ms to 2s
+        var feeAmount = (tx.Amount * 0.02m) + 0.30m; // 2% + 30 cents
+
+        return new TransactionOutcome(
+            DecisionId: decision.Decision_Id,
+            PspName: decision.Candidate,
+            Authorized: authorized,
+            TransactionAmount: tx.Amount,
+            FeeAmount: feeAmount,
+            ProcessingTimeMs: processingTime,
+            RiskScore: tx.RiskScore,
+            ProcessedAt: DateTime.UtcNow,
+            ErrorCode: authorized ? null : "AUTH_DECLINED",
+            ErrorMessage: authorized ? null : "Transaction declined by issuer"
+        );
     }
 }

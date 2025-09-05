@@ -46,3 +46,16 @@ public record RouteDecision(
     RouteConstraints Constraints,
     IReadOnlyList<string> Features_Used
 );
+
+public record TransactionOutcome(
+    string DecisionId,
+    string PspName,
+    bool Authorized,
+    decimal TransactionAmount,
+    decimal FeeAmount,
+    int ProcessingTimeMs,
+    int RiskScore,
+    DateTime ProcessedAt,
+    string? ErrorCode = null,
+    string? ErrorMessage = null
+);
