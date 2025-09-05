@@ -22,7 +22,7 @@ class Program
         var chat   = new OpenAIChatClient(apiKey, model: "gpt-4.1");
         var embed  = new OpenAIEmbeddings(apiKey, model: "text-embedding-3-large");
         var memory = new PgVectorMemory(pgConn, table: "psp_lessons");
-        var bandit = new EpsilonGreedyBandit(epsilon: 0.1); // 10% exploration
+        var bandit = new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: loggerFactory.CreateLogger<ContextualEpsilonGreedyBandit>()); // 10% exploration
         
         await memory.EnsureSchemaAsync(CancellationToken.None);
 

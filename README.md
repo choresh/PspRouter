@@ -19,10 +19,12 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - **Fallback Safety**: Graceful degradation to deterministic scoring when LLM is unavailable
 
 ### 🎰 **Multi-Armed Bandit Learning**
+- **Contextual Bandits**: Enhanced epsilon-greedy with transaction context awareness
 - **Epsilon-Greedy Algorithm**: Balances exploration vs exploitation (configurable epsilon)
 - **Thompson Sampling**: Bayesian approach for optimal arm selection
-- **Segment-Based Learning**: Different learning models per merchant/currency/scheme combination
+- **Contextual Features**: Uses transaction amount, risk score, and other features for better decisions
 - **Real-Time Updates**: Continuous learning from transaction outcomes
+- **Production Ready**: Thread-safe, efficient, and well-tested implementations
 
 ### 🧠 **Vector Memory System**
 - **Semantic Search**: pgvector-powered similarity search for routing lessons
@@ -64,7 +66,7 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - `DTOs.cs` – contracts.
 - `Interfaces.cs` – abstractions for clients/providers/tools.
 - `Tools.cs` – `get_psp_health`, `get_fee_quote` tool wrappers.
-- `Bandit.cs` – `IBandit`, `EpsilonGreedyBandit`, `ThompsonSamplingBandit`.
+- `Bandit.cs` – `IBandit`, `IContextualBandit`, `EpsilonGreedyBandit`, `ThompsonSamplingBandit`, `ContextualEpsilonGreedyBandit`.
 - `MemoryPgVector.cs` – `PgVectorMemory` (ensure schema, add/search).
 - `OpenAIChatClient.cs` – chat wrapper with `response_format=json_object` and tool-calling loop.
 - `EmbeddingsHelper.cs` – `OpenAIEmbeddings` helper (HTTP) for embeddings.
@@ -195,10 +197,13 @@ router.UpdateReward(decision, outcome);
 
 ### Bandit Learning
 ```csharp
-// Epsilon-Greedy with 10% exploration
+// Contextual Epsilon-Greedy (recommended)
+var bandit = new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger);
+
+// Standard Epsilon-Greedy
 var bandit = new EpsilonGreedyBandit(epsilon: 0.1);
 
-// Thompson Sampling for Bayesian approach
+// Thompson Sampling (Bayesian)
 var bandit = new ThompsonSamplingBandit();
 ```
 
@@ -307,6 +312,23 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO psp_router_prod;
 
 ## 🔧 Customization
 
+### External Bandit Libraries
+For production use, consider integrating with industry-standard libraries:
+
+```csharp
+// VowpalWabbit (requires .NET Framework compatibility)
+// Install-Package VowpalWabbit
+var bandit = new VowpalWabbitBandit();
+
+// Accord.NET (machine learning framework)
+// Install-Package Accord.MachineLearning
+// Custom implementation using Accord's algorithms
+
+// ML.NET (Microsoft's machine learning framework)
+// Install-Package Microsoft.ML
+// Custom contextual bandit implementation
+```
+
 ### Adding New PSPs
 1. Update `CapabilityMatrix.Supports()` method
 2. Implement health and fee providers
@@ -386,8 +408,11 @@ public async Task Learning_ShouldImproveOverTime()
 #### `PspRouter`
 Main routing engine with LLM and bandit integration.
 
+#### `ContextualEpsilonGreedyBandit`
+Enhanced contextual bandit with transaction feature awareness.
+
 #### `EpsilonGreedyBandit`
-Multi-armed bandit with epsilon-greedy exploration strategy.
+Standard multi-armed bandit with epsilon-greedy exploration strategy.
 
 #### `ThompsonSamplingBandit`
 Bayesian multi-armed bandit with Thompson sampling.

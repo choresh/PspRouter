@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 
 namespace PspRouter;
 
@@ -7,6 +8,15 @@ public interface IBandit
 {
     string Select(string segmentKey, IReadOnlyList<string> arms);
     void Update(string segmentKey, string arm, double reward);
+}
+
+/// <summary>
+/// Contextual bandit that considers transaction context in addition to segment key
+/// </summary>
+public interface IContextualBandit : IBandit
+{
+    string SelectWithContext(string segmentKey, IReadOnlyList<string> arms, Dictionary<string, object> context);
+    void UpdateWithContext(string segmentKey, string arm, double reward, Dictionary<string, object> context);
 }
 
 public sealed class EpsilonGreedyBandit : IBandit
@@ -100,5 +110,154 @@ public sealed class ThompsonSamplingBandit : IBandit
         RandomNumberGenerator.Fill(b);
         ulong ul = BitConverter.ToUInt64(b);
         return (ul / (double)ulong.MaxValue);
+    }
+}
+
+/// <summary>
+/// Enhanced contextual bandit that considers transaction features for better decisions
+/// </summary>
+public sealed class ContextualEpsilonGreedyBandit : IContextualBandit
+{
+    private readonly double _epsilon;
+    private readonly ILogger<ContextualEpsilonGreedyBandit>? _logger;
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (double sum, int count, Dictionary<string, double> features)>> _stats = new();
+
+    public ContextualEpsilonGreedyBandit(double epsilon = 0.1, ILogger<ContextualEpsilonGreedyBandit>? logger = null)
+    {
+        _epsilon = Math.Clamp(epsilon, 0.0, 1.0);
+        _logger = logger;
+    }
+
+    public string Select(string segmentKey, IReadOnlyList<string> arms)
+    {
+        return SelectWithContext(segmentKey, arms, new Dictionary<string, object>());
+    }
+
+    public string SelectWithContext(string segmentKey, IReadOnlyList<string> arms, Dictionary<string, object> context)
+    {
+        if (arms.Count == 0) throw new ArgumentException("No arms");
+        
+        // Extract context features
+        var features = ExtractContextFeatures(context);
+        
+        if (RandomNumberGenerator.GetInt32(0, 1000) < (int)(_epsilon * 1000))
+        {
+            var selected = arms[RandomNumberGenerator.GetInt32(arms.Count)];
+            _logger?.LogDebug("Contextual bandit exploration: selected {Arm} for segment {Segment}", selected, segmentKey);
+            return selected;
+        }
+
+        var seg = _stats.GetOrAdd(segmentKey, _ => new());
+        string best = arms[0];
+        double bestScore = double.NegativeInfinity;
+        
+        foreach (var arm in arms)
+        {
+            var (sum, count, armFeatures) = seg.GetOrAdd(arm, _ => (0.0, 0, new Dictionary<string, double>()));
+            
+            // Calculate contextual score
+            var score = CalculateContextualScore(sum, count, features, armFeatures);
+            
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = arm;
+            }
+        }
+        
+        _logger?.LogDebug("Contextual bandit exploitation: selected {Arm} with score {Score} for segment {Segment}", best, bestScore, segmentKey);
+        return best;
+    }
+
+    public void Update(string segmentKey, string arm, double reward)
+    {
+        UpdateWithContext(segmentKey, arm, reward, new Dictionary<string, object>());
+    }
+
+    public void UpdateWithContext(string segmentKey, string arm, double reward, Dictionary<string, object> context)
+    {
+        var seg = _stats.GetOrAdd(segmentKey, _ => new());
+        var features = ExtractContextFeatures(context);
+        
+        seg.AddOrUpdate(arm, _ => (reward, 1, features), (_, prev) =>
+        {
+            // Update statistics
+            var newSum = prev.sum + reward;
+            var newCount = prev.count + 1;
+            
+            // Update feature averages (exponential moving average)
+            var alpha = 0.1; // Learning rate for features
+            var newFeatures = new Dictionary<string, double>(prev.features);
+            
+            foreach (var (key, value) in features)
+            {
+                if (newFeatures.ContainsKey(key))
+                {
+                    newFeatures[key] = (1 - alpha) * newFeatures[key] + alpha * value;
+                }
+                else
+                {
+                    newFeatures[key] = value;
+                }
+            }
+            
+            return (newSum, newCount, newFeatures);
+        });
+        
+        _logger?.LogDebug("Updated contextual bandit: segment={Segment}, arm={Arm}, reward={Reward}", segmentKey, arm, reward);
+    }
+
+    private static Dictionary<string, double> ExtractContextFeatures(Dictionary<string, object> context)
+    {
+        var features = new Dictionary<string, double>();
+        
+        foreach (var (key, value) in context)
+        {
+            switch (value)
+            {
+                case double d:
+                    features[key] = d;
+                    break;
+                case int i:
+                    features[key] = i;
+                    break;
+                case decimal dec:
+                    features[key] = (double)dec;
+                    break;
+                case bool b:
+                    features[key] = b ? 1.0 : 0.0;
+                    break;
+                case string s when double.TryParse(s, out var parsed):
+                    features[key] = parsed;
+                    break;
+                default:
+                    // Convert other types to hash-based numeric features
+                    features[key] = Math.Abs(value.GetHashCode()) % 1000 / 1000.0;
+                    break;
+            }
+        }
+        
+        return features;
+    }
+
+    private static double CalculateContextualScore(double sum, int count, Dictionary<string, double> contextFeatures, Dictionary<string, double> armFeatures)
+    {
+        if (count == 0) return 0.0;
+        
+        var baseScore = sum / count;
+        
+        // Add contextual bonus based on feature similarity
+        var contextualBonus = 0.0;
+        foreach (var (key, value) in contextFeatures)
+        {
+            if (armFeatures.TryGetValue(key, out var armValue))
+            {
+                // Similarity bonus (higher when context matches arm's successful context)
+                var similarity = 1.0 - Math.Abs(value - armValue);
+                contextualBonus += similarity * 0.1; // Small bonus for context matching
+            }
+        }
+        
+        return baseScore + contextualBonus;
     }
 }
