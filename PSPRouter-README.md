@@ -1,119 +1,64 @@
 # PSP Router — Decision System for Payment Transactions
 
 ## 🎯 Purpose
-
-Modern e-commerce systems must decide **which Payment Service Provider (PSP)** — such as **Adyen, Stripe, Klarna, or PayPal** — should process each transaction.  
-The right choice impacts:
-
-- ✅ **Authorization rates** (maximize successful transactions)  
-- 💸 **Processing fees** (reduce costs)  
-- 🛡 **Risk & compliance** (3-D Secure, SCA mandates, sanctions)  
-- ⚡ **Latency & reliability** (avoid outages, prefer healthy providers)  
-- 🧑‍🤝‍🧑 **Merchant preferences** (custom rules, A/B tests, promo agreements)  
-
-This system implements an **intelligent router** that evaluates multiple signals and selects the optimal PSP for every payment attempt. It is designed to **learn from outcomes** over time and improve automatically.
-
----
+Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability.
 
 ## 🏗 Solution Overview
+- Deterministic **guardrails** (capabilities, SCA/3DS, health).
+- **LLM decision engine** with tool calling.
+- **Bandit learning** (ε-greedy / Thompson).
+- **pgvector memory** for “lessons learned.”
+- Deterministic **fallback** scoring when LLM is unavailable.
 
-The PSP Router combines **deterministic guardrails**, a **decision engine powered by LLMs**, and a **learning loop**:
+## 📦 Project Layout
+- `Program.cs` – minimal runnable example wiring **OpenAIChatClient**, tools, **PgVectorMemory**, and **OpenAIEmbeddings**.
+- `Router.cs` – decision engine (LLM first, fallback on parse/errors).
+- `DTOs.cs` – contracts.
+- `Interfaces.cs` – abstractions for clients/providers/tools.
+- `Tools.cs` – `get_psp_health`, `get_fee_quote` tool wrappers.
+- `Bandit.cs` – `IBandit`, `EpsilonGreedyBandit`, `ThompsonSamplingBandit`.
+- `MemoryPgVector.cs` – `PgVectorMemory` (ensure schema, add/search).
+- `OpenAIChatClient.cs` – chat wrapper with `response_format=json_object` and tool-calling loop.
+- `EmbeddingsHelper.cs` – `OpenAIEmbeddings` helper (HTTP) for embeddings.
+- `CapabilityMatrix.cs` – method→PSP gating.
+- `Dummies.cs` – dummy providers for local testing.
+- `PspRouter.csproj` – .NET 8, refs: `Npgsql`, `Pgvector`.
 
-### 1. Inputs (per transaction)
-
-- **Transaction context**: merchant, buyer country, currency, amount, method (Card, PayPal, Klarna), scheme (Visa, Mastercard, etc.), BIN prefix.  
-- **PSP capabilities**: which payment methods/countries/currencies each PSP supports.  
-- **Health signals**: status (green/yellow/red), latency, error spikes.  
-- **Performance metrics**: rolling authorization/success rates per segment.  
-- **Fee models**: % (bps) and fixed fees.  
-- **Merchant preferences**: allow/deny lists, “prefer low fees,” etc.
-
-### 2. Guardrails (code, not AI)
-
-Certain rules are enforced **deterministically**, before any model is consulted:
-
-- ❌ PSP that doesn’t support the required method/currency → excluded  
-- ❌ PSP in `red` health → excluded  
-- ❌ If SCA required but PSP lacks 3-DS → excluded  
-- ❌ Merchant blocklist → excluded  
-
-This ensures **safety and compliance**.
-
-### 3. Decision Engine
-
-- Uses **OpenAI (or Azure OpenAI)** via a C# client to evaluate valid candidates.  
-- The LLM sees a **compact context JSON** (PSP auth rates, fees, health, prefs).  
-- It proposes **one PSP candidate**, with alternates and reasoning.  
-- If the LLM fails or is unavailable, a **deterministic scoring fallback** selects the best PSP.
-
-### 4. Output
-
-A structured JSON decision:
-
-```json
-{
-  "schema_version": "1.0",
-  "decision_id": "uuid",
-  "candidate": "Adyen",
-  "alternates": ["Stripe", "PayPal"],
-  "reasoning": "Adyen has higher auth rate and lower fee in USD.",
-  "constraints": {
-    "must_use_3ds": true,
-    "retry_window_ms": 8000,
-    "max_retries": 1
-  },
-  "features_used": ["auth=0.89", "fee_bps=240", "health=green"],
-  "guardrail": "none"
-}
+## 🧩 Environment
+Set these before running:
+```bash
+export OPENAI_API_KEY=sk-...
+export PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
 ```
+> Ensure Postgres has the `vector` extension and that the table can be created: `CREATE EXTENSION IF NOT EXISTS vector;`
 
-This ensures **machine-readability** and **auditability**.
-
-### 5. Learning Loop
-
-- Logs every decision with outcome (authorized / declined / fee paid).  
-- Computes a **reward function**:  
-  `reward = success ? +1 : -1 − fee − risk_penalty`.  
-- Maintains **segment stats** (e.g., Visa|USD|IL → Adyen success 89%).  
-- Optional **bandit algorithm** (ε-greedy, Thompson sampling) for exploration.  
-- Stores **“lessons learned”** in a vector database (pgvector), retrievable into prompts.
-
-### 6. Extensibility
-
-- ✅ Add more PSPs (Checkout.com, Worldpay, etc.) by extending capability/fee providers.  
-- ✅ Add new signals (fraud scores, device fingerprint, FX cost).  
-- ✅ Add human approval for high-value transactions.  
-- ✅ Periodically fine-tune a smaller router model for low-latency inference.
-
----
-
-## ⚙ Components in the C# Project
-
-- `Program.cs` → Demo entry point with dummy providers  
-- `Router.cs` → Decision engine (LLM + fallback)  
-- `DTOs.cs` → Contracts: `RouteInput`, `PspSnapshot`, `RouteContext`, `RouteDecision`  
-- `Interfaces.cs` → Abstractions for health, fees, chat, and tools  
-- `Dummies.cs` → Dummy implementations for local testing  
-- `PspRouter.csproj` → .NET 8.0 project definition  
-
----
-
-## 🚀 How to Run
-
+## 🚀 Run
 ```bash
 cd src/PspRouter
 dotnet run
 ```
+You’ll see:
+1) A JSON **decision** (LLM if available; else deterministic).  
+2) A **pgvector** demo where a “lesson” is embedded and stored, then a top-3 semantic search prints results.
 
-This will execute a sample transaction and print a **decision JSON**.  
-Later, replace `DummyHealthProvider`, `DummyFeeProvider`, and `DummyChatClient` with your real integrations.
+## 🧠 Learning Loop (where to plug rewards)
+- After you receive gateway outcomes, compute a reward (e.g., `+1` for auth success minus fee/fx/risk penalties).
+- Update a bandit (`IBandit.Update(segmentKey, psp, reward)`).
+- Periodically summarize and `AddAsync` a short lesson via `OpenAIEmbeddings` + `PgVectorMemory`.
+
+## 🔒 Safety & Compliance
+- Do NOT send PAN/PII to the LLM (only BIN/scheme/aggregates).
+- Enforce SCA/3DS in code.
+- Keep an audit trail: features → decision → outcome.
+
+## 🛠 Replace Dummies
+- Implement `IHealthProvider` and `IFeeQuoteProvider` with your metrics/config.
+- Swap in your own stats for `AuthRate30d` and pass them in `RouteContext`.
+
+## 🔧 Tuning
+- Adjust embedding model & `vector(N)` dimension in `MemoryPgVector.cs` to match your chosen model.
+- Configure model name in `OpenAIChatClient` (default: `gpt-4.1`).
 
 ---
 
-## 📈 Benefits
-
-- **Higher success rates** by dynamically preferring the best PSP.  
-- **Lower costs** by considering real fees & FX impact.  
-- **Resiliency** via health checks and alternates.  
-- **Auditability** with structured JSON logs.  
-- **Continuous learning** from transaction outcomes.  
+Happy routing!
