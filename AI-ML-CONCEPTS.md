@@ -905,12 +905,8 @@ var contextJson = JsonSerializer.Serialize(new {
 ```
 
 ### **Important Distinction**
-- **Vector DB is FOR the LLM**: Used exclusively to enhance LLM decision-making (until next stages, see below)
-- **NOT a Fallback**: The deterministic fallback system does not use vector memory (until next stages, see below)
+- **Vector DB is FOR the LLM**: Used exclusively to enhance LLM decision-making, not for the bandit calculations (until next stages, see below)
 - **Memory vs. Logic**: Vector DB provides historical context, not routing logic
-- **LLM Enhancement Only**: Vector memory is only accessed during LLM-based routing decisions
-- **Fallback Independence**: Deterministic fallback relies on bandit learning and mathematical scoring only
-- **Context Provider**: Vector DB acts as the "memory" that helps LLM make informed decisions
 
 ### **Future Usage (Next Stages)**
 - **Bandit Recovery**: Vector DB will also store transaction outcomes for bandit statistics recovery at startup
