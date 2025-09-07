@@ -76,11 +76,32 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
 Console.WriteLine("=== PSP Router API Ready ===");
 Console.WriteLine("API endpoints available at:");
 Console.WriteLine("  POST /api/routing/route - Route a transaction");
 Console.WriteLine("  POST /api/routing/outcome - Update transaction outcome");
 Console.WriteLine("  GET  /api/routing/health - Check service health");
-Console.WriteLine("  Swagger UI: https://localhost:7xxx/swagger");
+
+// Get URLs from configuration
+var urls = builder.Configuration["urls"] ?? "http://localhost:5174;https://localhost:7149";
+var urlList = urls.Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+// Print the URLs to console and logs
+foreach (var url in urlList)
+{
+    var trimmedUrl = url.Trim();
+    Console.WriteLine($"  🌐 Application running at: {trimmedUrl}");
+    logger.LogInformation("Application running at: {Url}", trimmedUrl);
+    
+    // Generate Swagger URL for HTTPS URLs
+    if (trimmedUrl.StartsWith("https://"))
+    {
+        var swaggerUrl = $"{trimmedUrl}/swagger";
+        Console.WriteLine($"  📚 Swagger UI: {swaggerUrl}");
+        logger.LogInformation("Swagger UI available at: {SwaggerUrl}", swaggerUrl);
+    }
+}
 
 app.Run();
