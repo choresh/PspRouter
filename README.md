@@ -1555,7 +1555,304 @@ For questions and support:
 
 ---
 
-## 📚 Appendix: Bandit Learning Deep Dive
+## 📚 Appendix: AI/ML Concepts Explained for Programmers
+
+### **A.0 Overview**
+This appendix explains the key AI/ML concepts used in the PSP Router in programmer-friendly terms. No advanced mathematics required - just practical understanding of how these concepts work in our payment routing system.
+
+---
+
+## 🎰 **A.1 Multi-Armed Bandit: The Slot Machine Problem**
+
+### **What is a Multi-Armed Bandit?**
+A multi-armed bandit is a machine learning problem where an agent must choose between multiple actions (arms) to maximize cumulative reward over time. The name comes from slot machines (one-armed bandits) - imagine choosing between multiple slot machines to maximize winnings.
+
+### **Real-World Analogy**
+```
+You're in a casino with 4 slot machines:
+- Machine A: Unknown payout rate
+- Machine B: Unknown payout rate  
+- Machine C: Unknown payout rate
+- Machine D: Unknown payout rate
+
+Goal: Maximize your winnings over 1000 pulls
+Challenge: You don't know which machine pays best!
+```
+
+### **In PSP Router Context**
+```
+You have 4 PSPs to choose from:
+- Adyen: Unknown success rate
+- Stripe: Unknown success rate
+- Klarna: Unknown success rate  
+- PayPal: Unknown success rate
+
+Goal: Maximize authorization success over time
+Challenge: You don't know which PSP works best for each transaction type!
+```
+
+### **Key Concepts**
+- **Arms**: Available choices (in our case: Adyen, Stripe, Klarna, PayPal)
+- **Reward**: Outcome of choosing an arm (authorization success, fee optimization)
+- **Exploration vs Exploitation**: Balance between trying new arms vs using known good arms
+- **Regret**: Difference between optimal choice and actual choice
+
+---
+
+## 🧠 **A.2 Epsilon-Greedy Algorithm: The Simple but Effective Approach**
+
+### **What is Epsilon-Greedy?**
+Epsilon-greedy is a simple algorithm that balances exploration (trying new options) with exploitation (using known good options). The "epsilon" (ε) parameter controls this balance.
+
+### **How It Works**
+```csharp
+// Simple epsilon-greedy logic
+if (random < epsilon)
+    return random_arm();  // Explore (ε% of time)
+else
+    return best_known_arm();  // Exploit (1-ε% of time)
+```
+
+### **Real-World Example**
+```
+ε = 0.1 (10% exploration)
+
+90% of time: Choose Adyen (best known PSP)
+10% of time: Randomly try Stripe/Klarna/PayPal
+
+After 100 transactions:
+- 90 transactions: Use Adyen (exploitation)
+- 10 transactions: Try others (exploration)
+```
+
+### **Why It Works**
+- **Exploitation**: Uses what you know works
+- **Exploration**: Discovers new opportunities
+- **Learning**: Updates knowledge after each choice
+- **Simple**: Easy to understand and implement
+
+### **In PSP Router**
+```csharp
+// Configuration
+var epsilon = 0.1; // 10% exploration
+
+// Decision logic
+if (Random.Shared.NextDouble() < epsilon)
+{
+    // Explore: Try a random PSP
+    return candidates[Random.Shared.Next(candidates.Count)];
+}
+else
+{
+    // Exploit: Use the PSP with highest success rate
+    return candidates.OrderByDescending(c => c.AuthRate30d).First();
+}
+```
+
+---
+
+## 🎲 **A.3 Thompson Sampling: The Bayesian Approach**
+
+### **What is Thompson Sampling?**
+Thompson Sampling is a more sophisticated approach that uses probability distributions instead of simple averages. It's based on Bayesian statistics and naturally balances exploration and exploitation.
+
+### **How It Works**
+```csharp
+// Bayesian approach
+for each arm:
+    sample = beta_distribution(alpha, beta)
+    if sample > best_sample:
+        best_arm = arm
+return best_arm
+```
+
+### **Real-World Analogy**
+```
+Instead of saying "Adyen has 89% success rate"
+Thompson Sampling says "Adyen's success rate is probably between 85-93%"
+
+The algorithm samples from this probability distribution
+and chooses the arm with the highest sampled value.
+```
+
+### **Why It's Better**
+- **Uncertainty**: Naturally balances exploration/exploitation based on confidence
+- **Adaptive**: More exploration when uncertain, less when confident
+- **Bayesian**: Uses probability distributions instead of averages
+- **Optimal**: Theoretically optimal for many problems
+
+### **In PSP Router**
+```csharp
+// Each PSP has a probability distribution
+Adyen: Beta(89 successes, 11 failures) → Sample: 0.87
+Stripe: Beta(78 successes, 22 failures) → Sample: 0.82
+Klarna: Beta(45 successes, 55 failures) → Sample: 0.41
+
+// Choose the PSP with highest sample
+return "Adyen" // (0.87 > 0.82 > 0.41)
+```
+
+---
+
+## 🎯 **A.4 Contextual Bandits: Adding Transaction Context**
+
+### **What is a Contextual Bandit?**
+A contextual bandit is a multi-armed bandit that considers additional context (features) when making decisions. Instead of just choosing between arms, it considers the current situation.
+
+### **Traditional vs Contextual Bandits**
+
+**Traditional Bandit:**
+```
+Segment: "US_USD_Visa"
+Decision: Always choose Adyen (89% success rate)
+```
+
+**Contextual Bandit:**
+```
+Segment: "US_USD_Visa"
+Context: {amount: 500, risk: 30, sca: true}
+Decision: Choose Stripe (better for high-risk SCA transactions)
+```
+
+### **Why Context Matters**
+```
+Same PSP, different contexts:
+- Adyen + Low Risk + No SCA = 95% success
+- Adyen + High Risk + SCA Required = 70% success
+
+Contextual bandit learns these patterns!
+```
+
+### **In PSP Router**
+```csharp
+// Transaction context
+var context = {
+    "amount": 150.00m,      // → 150.0
+    "risk_score": 25,       // → 25.0
+    "sca_required": true,   // → 1.0
+    "currency": "USD",      // → 0.123 (hash-based)
+    "merchant_tier": "premium" // → 0.456 (hash-based)
+};
+
+// Contextual decision
+var decision = bandit.SelectWithContext(segmentKey, candidates, context);
+```
+
+---
+
+## 🔍 **A.5 Semantic Search: Finding Meaning, Not Just Words**
+
+### **What is Semantic Search?**
+Semantic search finds relevant information based on meaning, not just exact word matches. It understands the intent behind queries and finds conceptually similar content.
+
+### **Traditional vs Semantic Search**
+
+**Traditional Search (Keyword-based):**
+```
+Query: "Visa card from US merchant, $200"
+Search: Finds exact matches only
+Result: No results found
+```
+
+**Semantic Search (Meaning-based):**
+```
+Query: "Visa card from US merchant, $200"
+Search: Finds semantically similar transactions
+Result: "Visa card from US merchant, $150, routed to Stripe, authorized in 2.3s"
+```
+
+### **Why It's Powerful**
+- **Flexible**: Finds relevant content even with different wording
+- **Intelligent**: Understands context and meaning
+- **Comprehensive**: Captures relationships between concepts
+- **Human-like**: Mimics how humans search for information
+
+### **In PSP Router**
+```csharp
+// Query: "Visa card from US merchant, $200"
+// Finds similar transactions:
+// 1. "Visa card from US merchant, $150, routed to Stripe, authorized in 2.3s" (similarity: 0.95)
+// 2. "Visa card from US merchant, $300, routed to Stripe, authorized in 1.8s" (similarity: 0.92)
+// 3. "Visa card from US merchant, $100, routed to Adyen, authorized in 3.1s" (similarity: 0.88)
+```
+
+---
+
+## 📐 **A.6 Cosine Similarity: Measuring Vector Similarity**
+
+### **What is Cosine Similarity?**
+Cosine similarity measures how similar two vectors are by calculating the cosine of the angle between them. It's a mathematical way to compare the "direction" of vectors.
+
+### **How It Works**
+```
+Vector A: [0.1, 0.8, 0.3, 0.2]
+Vector B: [0.2, 0.7, 0.4, 0.1]
+
+Cosine Similarity = (A · B) / (|A| × |B|)
+                  = 0.85 (very similar)
+
+Vector C: [0.9, 0.1, 0.8, 0.7]
+Cosine Similarity = 0.23 (not similar)
+```
+
+### **Why It's Useful**
+- **Range**: Always between -1 and 1
+- **Direction**: Measures direction, not magnitude
+- **Normalized**: Works well with different vector lengths
+- **Intuitive**: 1 = identical, 0 = orthogonal, -1 = opposite
+
+### **In PSP Router**
+```csharp
+// Transaction embeddings
+var queryEmbedding = [0.1, 0.8, 0.3, 0.2, ...]; // Current transaction
+var lessonEmbedding = [0.2, 0.7, 0.4, 0.1, ...]; // Past transaction
+
+// Calculate similarity
+var similarity = CosineSimilarity(queryEmbedding, lessonEmbedding);
+// Result: 0.85 (very similar transactions)
+```
+
+---
+
+## 🧠 **A.7 LLM (Large Language Model): The AI Brain**
+
+### **What is an LLM?**
+A Large Language Model is an AI system trained on vast amounts of text data that can understand and generate human-like text. In our case, we use GPT-4 to make intelligent routing decisions.
+
+### **How It Works**
+```
+Input: Transaction context + Historical lessons + PSP candidates
+↓
+LLM Processing: Analyzes context, considers options, applies reasoning
+↓
+Output: Structured decision with reasoning
+```
+
+### **Why It's Powerful**
+- **Context Understanding**: Considers complex relationships
+- **Reasoning**: Can explain its decisions
+- **Flexibility**: Handles edge cases and new scenarios
+- **Learning**: Improves with more context and examples
+
+### **In PSP Router**
+```csharp
+// LLM receives comprehensive context
+var context = {
+    Transaction: currentTx,
+    Candidates: validCandidates,
+    MerchantPreferences: preferences,
+    SegmentStats: statistics,
+    RelevantLessons: historicalLessons
+};
+
+// LLM makes intelligent decision
+var decision = await llm.CompleteJsonAsync(systemPrompt, userInstruction, context);
+// Result: {"candidate": "Stripe", "reasoning": "Best for high-risk SCA transactions"}
+```
+
+---
+
+## 📚 **A.8 Bandit Learning Deep Dive**
 
 ### A.1 Understanding Multi-Armed Bandits
 
