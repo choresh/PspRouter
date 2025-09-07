@@ -4,11 +4,14 @@
 Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using **LLM-based decision making**, **multi-armed bandit learning**, and **vector memory**.
 
 ## 🏗 Solution Overview
-- Deterministic **guardrails** (capabilities, SCA/3DS, health).
-- **LLM decision engine** with tool calling.
-- **Bandit learning** (ε-greedy / Thompson).
-- **pgvector memory** for "lessons learned."
-- Deterministic **fallback** scoring when LLM is unavailable.
+- **Generic Host Architecture**: Enterprise-grade .NET hosting with dependency injection
+- **Configuration Management**: JSON + environment variables with hierarchical config
+- **Deterministic Guardrails**: Capabilities, SCA/3DS, health checks
+- **LLM Decision Engine**: GPT-4 with tool calling and structured responses
+- **Contextual Bandit Learning**: Enhanced epsilon-greedy with transaction context
+- **Vector Memory System**: pgvector-powered semantic search for lessons learned
+- **Graceful Fallback**: Deterministic scoring when LLM is unavailable
+- **Production Ready**: Structured logging, health checks, and monitoring
 
 ## ✨ Key Features
 
@@ -32,47 +35,81 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - **Lesson Learning**: Automatic capture and retrieval of routing insights
 - **Historical Context**: Leverages past decisions for better routing
 
+### 🏗️ **Generic Host Architecture**
+- **Enterprise-Grade Hosting**: Built on .NET Generic Host for production deployment
+- **Dependency Injection**: Automatic service lifetime management and disposal
+- **Configuration Management**: Hierarchical configuration with JSON, environment variables, and command line
+- **Service Registration**: Clean separation of concerns with proper service lifetimes
+- **Graceful Shutdown**: Proper application lifecycle management
+- **Extensibility**: Easy to add hosted services, health checks, and background tasks
+
 ### 📊 **Comprehensive Monitoring**
 - **Structured Logging**: Detailed logging with Microsoft.Extensions.Logging
 - **Performance Metrics**: Processing time, success rates, fee optimization
 - **Audit Trail**: Complete decision history with reasoning
 - **Error Tracking**: Comprehensive error handling and reporting
+- **Host Integration**: Logging integrated with .NET hosting infrastructure
 
 ## 🏗 Architecture
 
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                    .NET Generic Host                            │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              Dependency Injection Container             │   │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │   │
+│  │  │   Health    │ │    Fees     │ │    Chat     │       │   │
+│  │  │  Provider   │ │  Provider   │ │   Client    │       │   │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘       │   │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │   │
+│  │  │   Bandit    │ │   Memory    │ │  Embeddings │       │   │
+│  │  │  Learning   │ │   System    │ │   Service   │       │   │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
 ┌─────────────────┐    ┌──────────────────┐     ┌─────────────────┐
 │   Transaction   │───▶│   PSP Router     │───▶│   Decision      │
-│   Input         │    │                  │     │   Output        │
+│   Input         │    │   (Scoped)       │     │   Output        │
 └─────────────────┘    └──────────────────┘     └─────────────────┘
                               │
                               ▼
                     ┌──────────────────┐
-                    │   Learning       │
-                    │   Components     │
+                    │   LLM Engine     │
+                    │   (GPT-4)        │
                     └──────────────────┘
                               │
-                    ┌─────────┴─────────┐
-                    ▼                   ▼
-            ┌─────────────┐    ┌─────────────┐
-            │   Bandit    │    │   Vector    │
-            │   Learning  │    │   Memory    │
-            └─────────────┘    └─────────────┘
+                              ▼
+                    ┌──────────────────┐
+                    │   Contextual     │
+                    │   Bandit         │
+                    └──────────────────┘
+                              │
+                              ▼
+                    ┌──────────────────┐
+                    │   Vector         │
+                    │   Memory         │
+                    │   (pgvector)     │
+                    └──────────────────┘
 ```
 
 ## 📦 Project Layout
-- `Program.cs` – minimal runnable example wiring **OpenAIChatClient**, tools, **PgVectorMemory**, and **OpenAIEmbeddings**.
-- `Router.cs` – decision engine (LLM first, fallback on parse/errors).
-- `DTOs.cs` – contracts.
-- `Interfaces.cs` – abstractions for clients/providers/tools.
-- `Tools.cs` – `get_psp_health`, `get_fee_quote` tool wrappers.
-- `Bandit.cs` – `IBandit`, `IContextualBandit`, `EpsilonGreedyBandit`, `ThompsonSamplingBandit`, `ContextualEpsilonGreedyBandit`.
-- `MemoryPgVector.cs` – `PgVectorMemory` (ensure schema, add/search).
-- `OpenAIChatClient.cs` – chat wrapper with `response_format=json_object` and tool-calling loop.
-- `EmbeddingsHelper.cs` – `OpenAIEmbeddings` helper (HTTP) for embeddings.
-- `CapabilityMatrix.cs` – method→PSP gating.
-- `Dummies.cs` – dummy providers for local testing.
-- `PspRouter.csproj` – .NET 8, refs: `Npgsql`, `Pgvector`.
+- `Program.cs` – **Generic Host** application with dependency injection, configuration, and service registration
+- `PspRouterDemo.cs` – Demo service showcasing the complete PSP routing system with learning
+- `Router.cs` – Decision engine (LLM first, fallback on parse/errors)
+- `DTOs.cs` – Data transfer objects and contracts
+- `Interfaces.cs` – Service abstractions and interfaces
+- `Tools.cs` – LLM tool implementations (`get_psp_health`, `get_fee_quote`)
+- `Bandit.cs` – Multi-armed bandit implementations (`IBandit`, `IContextualBandit`, `EpsilonGreedyBandit`, `ThompsonSamplingBandit`, `ContextualEpsilonGreedyBandit`)
+- `MemoryPgVector.cs` – `PgVectorMemory` implementation with pgvector (ensure schema, add/search)
+- `OpenAIChatClient.cs` – Chat wrapper with `response_format=json_object` and tool-calling loop
+- `EmbeddingsHelper.cs` – `OpenAIEmbeddings` service for vector embeddings
+- `CapabilityMatrix.cs` – Deterministic PSP support rules (method→PSP gating)
+- `Dummies.cs` – Mock implementations for local testing
+- `appsettings.json` – Configuration file with logging and PSP router settings
+- `setup-database.sql` – PostgreSQL database setup script with pgvector extension
+- `PspRouter.csproj` – .NET 8 project with Generic Host dependencies (`Microsoft.Extensions.Hosting`, `Microsoft.Extensions.Configuration`, etc.)
 
 ## 🧠 LLM's Role in PSP Routing
 
@@ -294,6 +331,19 @@ This makes the system capable of handling real-world payment routing scenarios t
 - PostgreSQL with pgvector extension
 - OpenAI API key
 
+### 🏗️ **Generic Host Benefits**
+This application uses .NET Generic Host, providing:
+- **Automatic Dependency Injection**: Services are automatically registered and managed
+- **Configuration Management**: JSON + environment variables with hierarchical config
+- **Structured Logging**: Built-in logging with multiple providers
+- **Graceful Shutdown**: Proper application lifecycle management
+- **Production Ready**: Enterprise-grade hosting infrastructure
+- **Extensibility**: Easy to add hosted services, health checks, and background tasks
+- **Service Lifetime Management**: Automatic disposal and cleanup of resources
+- **Environment Support**: Development, Staging, Production configurations
+- **Command Line Integration**: Built-in support for command line arguments
+- **Hosting Flexibility**: Can be deployed as console app, Windows service, or container
+
 ### 1. Database Setup
 
 #### Install PostgreSQL with pgvector
@@ -354,14 +404,101 @@ export OPENAI_API_KEY="sk-your-openai-key"
 export PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
 ```
 
-### 3. Run the Application
+### 3. Configuration Management
+
+The application uses hierarchical configuration with the following precedence (highest to lowest):
+
+1. **Command Line Arguments**: `dotnet run -- --setting=value`
+2. **Environment Variables**: `OPENAI_API_KEY`, `PGVECTOR_CONNSTR`
+3. **appsettings.{Environment}.json**: Environment-specific settings
+4. **appsettings.json**: Default configuration
+
+#### Configuration Files
+
+**`appsettings.json`** (default):
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning"
+    }
+  },
+  "PspRouter": {
+    "OpenAI": {
+      "Model": "gpt-4.1",
+      "EmbeddingModel": "text-embedding-3-large"
+    },
+    "Bandit": {
+      "Epsilon": 0.1,
+      "Algorithm": "ContextualEpsilonGreedy"
+    },
+    "Database": {
+      "TableName": "psp_lessons"
+    }
+  }
+}
+```
+
+**`appsettings.Production.json`** (production overrides):
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "PspRouter": "Information"
+    }
+  },
+  "PspRouter": {
+    "Bandit": {
+      "Epsilon": 0.05
+    }
+  }
+}
+```
+
+### 4. Service Registration & Lifetimes
+
+The application uses proper dependency injection with appropriate service lifetimes:
+
+```csharp
+// Singleton services (shared across the application)
+services.AddSingleton<IHealthProvider, DummyHealthProvider>();
+services.AddSingleton<IFeeQuoteProvider, DummyFeeProvider>();
+services.AddSingleton<IChatClient>(provider => new OpenAIChatClient(apiKey, model: "gpt-4.1"));
+services.AddSingleton<OpenAIEmbeddings>(provider => new OpenAIEmbeddings(apiKey, model: "text-embedding-3-large"));
+services.AddSingleton<IVectorMemory>(provider => new PgVectorMemory(pgConn, table: "psp_lessons"));
+services.AddSingleton<IContextualBandit>(provider => new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: logger));
+
+// Scoped services (per request/operation)
+services.AddScoped<PspRouter.PspRouter>(provider => /* ... */);
+
+// Transient services (new instance each time)
+services.AddTransient<PspRouterDemo>();
+```
+
+**Service Lifetime Benefits:**
+- **Singleton**: Shared state, efficient resource usage (health providers, embeddings)
+- **Scoped**: Per-operation state, thread-safe (PSP router instances)
+- **Transient**: No shared state, always fresh (demo services)
+
+### 5. Run the Application
 
 ```bash
 # Build the project
 dotnet build
 
-# Run the enhanced demo
+# Run the enhanced demo with Generic Host
 dotnet run
+
+# Run with specific environment
+dotnet run --environment Production
+
+# Run with custom configuration
+dotnet run --configuration Release
+
+# Run with additional arguments
+dotnet run -- --help
 ```
 
 ### Expected Output

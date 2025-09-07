@@ -1,41 +1,127 @@
 using System.Text.Json;
 using PspRouter;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 
 class Program
 {
-    static async Task Main()
+    static async Task Main(string[] args)
+    {
+        // === Build Host with Configuration ===
+        var host = Host.CreateDefaultBuilder(args)
+            .ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddEnvironmentVariables();
+                config.AddJsonFile("appsettings.json", optional: true);
+                config.AddJsonFile($"appsettings.{context.HostingEnvironment.EnvironmentName}.json", optional: true);
+            })
+            .ConfigureServices((context, services) =>
     {
         // === Configuration ===
-        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "sk-...";
-        var pgConn = Environment.GetEnvironmentVariable("PGVECTOR_CONNSTR") 
+                var configuration = context.Configuration;
+                var apiKey = configuration["OPENAI_API_KEY"] ?? "sk-...";
+                var pgConn = configuration["PGVECTOR_CONNSTR"] 
                      ?? "Host=localhost;Username=postgres;Password=postgres;Database=psp_router";
 
-        // === Logging Setup ===
-        using var loggerFactory = LoggerFactory.Create(builder =>
-            builder.AddConsole().SetMinimumLevel(LogLevel.Information));
-        var logger = loggerFactory.CreateLogger<PspRouter.PspRouter>();
+                // === Register Services ===
+                services.AddSingleton<IHealthProvider, DummyHealthProvider>();
+                services.AddSingleton<IFeeQuoteProvider, DummyFeeProvider>();
+                services.AddSingleton<IChatClient>(provider => 
+                    new OpenAIChatClient(apiKey, model: "gpt-4.1"));
+                services.AddSingleton<OpenAIEmbeddings>(provider => 
+                    new OpenAIEmbeddings(apiKey, model: "text-embedding-3-large"));
+                services.AddSingleton<IVectorMemory>(provider => 
+                    new PgVectorMemory(pgConn, table: "psp_lessons"));
+                services.AddSingleton<IContextualBandit>(provider => 
+                {
+                    var logger = provider.GetRequiredService<ILogger<ContextualEpsilonGreedyBandit>>();
+                    return new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: logger);
+                });
 
-        // === Providers & Clients ===
-        var health = new DummyHealthProvider();   // replace with real metrics
-        var fees   = new DummyFeeProvider();      // replace with real fee tables
-        var chat   = new OpenAIChatClient(apiKey, model: "gpt-4.1");
-        var embed  = new OpenAIEmbeddings(apiKey, model: "text-embedding-3-large");
-        var memory = new PgVectorMemory(pgConn, table: "psp_lessons");
-        var bandit = new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: loggerFactory.CreateLogger<ContextualEpsilonGreedyBandit>()); // 10% exploration
-        
-        await memory.EnsureSchemaAsync(CancellationToken.None);
+                // === Register Router as Scoped (for request-based operations) ===
+                services.AddScoped<PspRouter.PspRouter>(provider =>
+                {
+                    var chat = provider.GetRequiredService<IChatClient>();
+                    var health = provider.GetRequiredService<IHealthProvider>();
+                    var fees = provider.GetRequiredService<IFeeQuoteProvider>();
+                    var bandit = provider.GetRequiredService<IContextualBandit>();
+                    var memory = provider.GetRequiredService<IVectorMemory>();
+                    var logger = provider.GetRequiredService<ILogger<PspRouter.PspRouter>>();
+                    
+                    var tools = new List<IAgentTool>
+                    {
+                        new GetHealthTool(health),
+                        new GetFeeQuoteTool(fees, () => new RouteInput("", "", "", "", 0, PaymentMethod.Card))
+                    };
 
-        // === Tools exposed to the LLM ===
-        var tools = new List<IAgentTool>
+                    return new PspRouter.PspRouter(chat, health, fees, tools, bandit, memory, logger);
+                });
+
+                // === Register Demo Service ===
+                services.AddTransient<PspRouterDemo>();
+            })
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddConsole();
+                logging.AddDebug();
+                logging.SetMinimumLevel(LogLevel.Information);
+            })
+            .Build();
+
+        // === Initialize Database Schema ===
+        using (var scope = host.Services.CreateScope())
         {
-            new GetHealthTool(health),
-            new GetFeeQuoteTool(fees, () => new RouteInput("", "", "", "", 0, PaymentMethod.Card))
-        };
+            var memory = scope.ServiceProvider.GetRequiredService<IVectorMemory>();
+        await memory.EnsureSchemaAsync(CancellationToken.None);
+        }
 
-        // === Create router with all components ===
-        var router = new PspRouter.PspRouter(chat, health, fees, tools, bandit, memory, logger);
+        // === Run Demo ===
+        using (var scope = host.Services.CreateScope())
+        {
+            var demo = scope.ServiceProvider.GetRequiredService<PspRouterDemo>();
+            await demo.RunAsync();
+        }
 
+        // === Graceful Shutdown ===
+        await host.StopAsync();
+        await host.WaitForShutdownAsync();
+    }
+
+}
+
+/// <summary>
+/// Demo service that showcases the PSP Router capabilities
+/// </summary>
+public class PspRouterDemo
+{
+    private readonly PspRouter.PspRouter _router;
+    private readonly IHealthProvider _health;
+    private readonly IFeeQuoteProvider _fees;
+    private readonly OpenAIEmbeddings _embed;
+    private readonly IVectorMemory _memory;
+    private readonly ILogger<PspRouterDemo> _logger;
+
+    public PspRouterDemo(
+        PspRouter.PspRouter router,
+        IHealthProvider health,
+        IFeeQuoteProvider fees,
+        OpenAIEmbeddings embed,
+        IVectorMemory memory,
+        ILogger<PspRouterDemo> logger)
+    {
+        _router = router;
+        _health = health;
+        _fees = fees;
+        _embed = embed;
+        _memory = memory;
+        _logger = logger;
+    }
+
+    public async Task RunAsync()
+    {
         Console.WriteLine("=== Enhanced PSP Router Demo ===\n");
         Console.WriteLine("This demo showcases the complete PSP routing system with:");
         Console.WriteLine("• LLM-based intelligent routing");
@@ -63,7 +149,7 @@ class Program
             Console.WriteLine($"Merchant: {tx.MerchantId}, Amount: {tx.Amount} {tx.Currency}, Method: {tx.Method}");
 
             // Build context
-            var candidates = await BuildCandidatesAsync(tx, health, fees);
+            var candidates = await BuildCandidatesAsync(tx);
             var prefs = new Dictionary<string, string> { ["prefer_low_fees"] = "true" };
             var stats = new Dictionary<string, double>
             {
@@ -76,7 +162,7 @@ class Program
             var ctx = new RouteContext(tx, candidates, prefs, stats);
 
             // Make routing decision
-            var decision = await router.DecideAsync(ctx, CancellationToken.None);
+            var decision = await _router.DecideAsync(ctx, CancellationToken.None);
             Console.WriteLine($"Decision: {decision.Candidate}");
             Console.WriteLine($"Reasoning: {decision.Reasoning}");
             
@@ -88,15 +174,15 @@ class Program
 
             // Simulate outcome and update learning
             var outcome = SimulateRealisticOutcome(decision, tx);
-            router.UpdateReward(decision, outcome);
+            _router.UpdateReward(decision, outcome);
             Console.WriteLine($"Outcome: {(outcome.Authorized ? "✓ Authorized" : "✗ Declined")} - Fee: {outcome.FeeAmount:C} - Time: {outcome.ProcessingTimeMs}ms");
 
             // Add lesson to memory
             try
             {
                 var lesson = $"Transaction {tx.MerchantId}|{tx.Currency}|{tx.Method}: {decision.Candidate} {(outcome.Authorized ? "succeeded" : "failed")} with {outcome.ProcessingTimeMs}ms processing time";
-                var embedding = await embed.EmbedAsync(lesson, CancellationToken.None);
-                await memory.AddAsync($"lesson_{i}_{DateTime.UtcNow:yyyyMMddHHmmss}", lesson,
+                var embedding = await _embed.EmbedAsync(lesson, CancellationToken.None);
+                await _memory.AddAsync($"lesson_{i}_{DateTime.UtcNow:yyyyMMddHHmmss}", lesson,
                     new Dictionary<string, string> { ["psp"] = decision.Candidate, ["outcome"] = outcome.Authorized.ToString() },
                     embedding, CancellationToken.None);
                 Console.WriteLine($"✓ Lesson added to memory");
@@ -113,8 +199,8 @@ class Program
         try
         {
             Console.WriteLine("=== Memory Search Demo ===");
-            var queryEmbedding = await embed.EmbedAsync("Prefer higher auth for USD Visa", CancellationToken.None);
-            var top = await memory.SearchAsync(queryEmbedding, k: 3, CancellationToken.None);
+            var queryEmbedding = await _embed.EmbedAsync("Prefer higher auth for USD Visa", CancellationToken.None);
+            var top = await _memory.SearchAsync(queryEmbedding, k: 3, CancellationToken.None);
 
             Console.WriteLine("Top memory results:");
             foreach (var (key, text, meta, score) in top)
@@ -155,7 +241,7 @@ class Program
         Console.WriteLine("The Enhanced PSP Router is ready for production deployment!");
     }
 
-    private static async Task<List<PspSnapshot>> BuildCandidatesAsync(RouteInput tx, IHealthProvider health, IFeeQuoteProvider fees)
+    private async Task<List<PspSnapshot>> BuildCandidatesAsync(RouteInput tx)
     {
         var candidates = new List<PspSnapshot>();
         var pspNames = new[] { "Adyen", "Stripe", "Klarna", "PayPal" };
@@ -164,8 +250,8 @@ class Program
         {
             if (!CapabilityMatrix.Supports(psp, tx)) continue;
 
-            var (healthState, _) = await health.GetAsync(psp, CancellationToken.None);
-            var (bps, fixedFee) = await fees.GetAsync(psp, tx, CancellationToken.None);
+            var (healthState, _) = await _health.GetAsync(psp, CancellationToken.None);
+            var (bps, fixedFee) = await _fees.GetAsync(psp, tx, CancellationToken.None);
 
             candidates.Add(new PspSnapshot(
                 Name: psp,
