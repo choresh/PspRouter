@@ -74,6 +74,219 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - `Dummies.cs` – dummy providers for local testing.
 - `PspRouter.csproj` – .NET 8, refs: `Npgsql`, `Pgvector`.
 
+## 🧠 LLM's Role in PSP Routing
+
+### **Primary Function: Intelligent Decision Engine**
+
+The LLM serves as the **brain** of the PSP Router, acting as an expert payment routing consultant that makes complex, context-aware decisions. It's the primary decision maker that considers multiple factors simultaneously and provides reasoning for its choices.
+
+### **Decision Flow: LLM vs Bandit**
+
+```
+Transaction Request
+        ↓
+    [Guardrails] ← Compliance checks, health status
+        ↓
+    [LLM Decision] ← Primary intelligent routing
+        ↓
+    [Fallback] ← Bandit learning if LLM fails
+        ↓
+    [Final Decision]
+```
+
+### **What the LLM Receives**
+
+The LLM gets comprehensive context for each decision:
+
+```json
+{
+  "Transaction": {
+    "MerchantId": "M123",
+    "Amount": 150.00,
+    "Currency": "USD", 
+    "Method": "Card",
+    "Scheme": "Visa",
+    "SCARequired": false,
+    "RiskScore": 18
+  },
+  "Candidates": [
+    {
+      "Name": "Adyen",
+      "Health": "green",
+      "AuthRate30d": 0.89,
+      "FeeBps": 200,
+      "Supports3DS": true
+    }
+  ],
+  "MerchantPreferences": {
+    "prefer_low_fees": "true"
+  },
+  "SegmentStats": {
+    "Adyen_USD_Visa_auth": 0.89,
+    "Stripe_USD_Visa_auth": 0.87
+  },
+  "RelevantLessons": [
+    "USD Visa transactions work well with Adyen for low-risk merchants"
+  ]
+}
+```
+
+### **LLM's Decision Process**
+
+#### **1. Context Analysis**
+- Transaction characteristics (amount, risk, currency, method)
+- PSP capabilities and real-time health status
+- Merchant preferences and business rules
+- Historical performance data from bandit learning
+- Relevant lessons from vector memory
+
+#### **2. Business Logic Application**
+- **Compliance Enforcement**: SCA/3DS requirements, payment method support
+- **Health Checks**: Only routes to healthy PSPs
+- **Preference Handling**: Considers merchant fee vs auth rate preferences
+- **Risk Management**: Applies risk-based routing rules
+
+#### **3. Intelligent Reasoning**
+The LLM can handle complex scenarios like:
+- "High-risk transaction needs 3DS support"
+- "Merchant prefers low fees, but auth rate is more important for this amount"
+- "Historical data shows Stripe performs better for SCA transactions"
+- "Weekend transactions have different patterns"
+
+#### **4. Structured Decision Output**
+```json
+{
+  "Candidate": "Stripe",
+  "Reasoning": "Chose Stripe over Adyen because: 1) Transaction requires SCA and Stripe has better 3DS performance, 2) Historical data shows 3% higher auth rate for SCA transactions, 3) Fee difference is minimal for this amount",
+  "Features_Used": ["sca_required=true", "auth_rate=0.87", "fee_bps=200"]
+}
+```
+
+### **Advanced LLM Capabilities**
+
+#### **Tool Calling for Real-Time Data**
+```csharp
+// LLM can call external APIs for current information
+var tools = new List<IAgentTool>
+{
+    new GetHealthTool(health),      // Get current PSP health status
+    new GetFeeQuoteTool(fees, tx)   // Get real-time fee quotes
+};
+```
+
+#### **Memory Integration**
+```csharp
+// LLM uses vector memory for contextual lessons
+var lessons = await GetRelevantLessonsAsync(ctx, ct);
+// Example: "Similar transactions: Adyen failed for high-risk SCA, Stripe succeeded"
+```
+
+#### **Complex Scenario Handling**
+The LLM excels at handling edge cases:
+- **Compliance Conflicts**: "Merchant has 3D Secure preference but transaction is low-risk"
+- **Trade-off Analysis**: "Fee difference is $0.50 but auth rate difference is 5%"
+- **Temporal Patterns**: "Historical data shows weekend transactions perform differently"
+- **Multi-factor Decisions**: Balancing auth rates, fees, compliance, and preferences
+
+### **LLM vs Bandit: When Each is Used**
+
+#### **LLM is Primary When:**
+- ✅ **Complex context** needs analysis
+- ✅ **Business rules** must be applied
+- ✅ **Compliance** requirements exist
+- ✅ **Merchant preferences** matter
+- ✅ **Historical lessons** are relevant
+- ✅ **Edge cases** need expert reasoning
+
+#### **Bandit is Fallback When:**
+- ⚠️ **LLM is unavailable** (API failure, timeout)
+- ⚠️ **LLM response is invalid** (parsing error)
+- ⚠️ **Simple scenarios** where bandit is sufficient
+- ⚠️ **High-volume** transactions where speed matters
+
+### **Learning Integration**
+
+#### **1. Feeds Bandit Learning**
+```csharp
+// LLM decisions become training data for bandit
+var outcome = ProcessTransaction(decision);
+router.UpdateReward(decision, outcome); // Updates bandit statistics
+```
+
+#### **2. Learns from Bandit Data**
+```csharp
+// LLM uses bandit statistics in its decisions
+"SegmentStats": {
+    "Adyen_USD_Visa_auth": 0.89,  // From bandit learning
+    "Stripe_USD_Visa_auth": 0.87
+}
+```
+
+#### **3. Creates Memory Lessons**
+```csharp
+// LLM decisions become lessons for future use
+var lesson = $"Transaction {tx.Amount} {tx.Currency}: {decision.Candidate} succeeded because {decision.Reasoning}";
+await memory.AddAsync(lesson, embedding);
+```
+
+### **Real-World Example**
+
+#### **Scenario**: $500 USD Visa, risk=40, SCA required, merchant prefers low fees
+
+**LLM's Analysis:**
+```
+1. Compliance: SCA required → Need 3DS support
+2. Context: High amount + high risk + SCA = complex scenario  
+3. Preferences: Low fees vs auth success trade-off
+4. History: "High-risk SCA transactions: Stripe 92% vs Adyen 85%"
+5. Reasoning: "Fee difference is $2.50, but auth rate difference is 7%"
+6. Decision: Choose Stripe (auth success more valuable than fee savings)
+```
+
+**LLM Response:**
+```json
+{
+  "Candidate": "Stripe",
+  "Reasoning": "Selected Stripe for high-risk SCA transaction. While Adyen has lower fees ($2.50 difference), Stripe's 7% higher auth rate for SCA transactions provides better overall value. Historical data shows 92% vs 85% success rate for similar transactions.",
+  "Features_Used": ["sca_required=true", "risk_score=40", "amount=500", "auth_rate=0.92"]
+}
+```
+
+### **System Prompt Engineering**
+
+The LLM uses a carefully crafted system prompt that defines its role:
+
+```
+You are an expert payment service provider (PSP) routing system. Your job is to select the optimal PSP for each transaction to maximize authorization success, minimize fees, and ensure compliance.
+
+CRITICAL RULES:
+1. NEVER route to a PSP that doesn't support the payment method
+2. ALWAYS enforce SCA/3DS requirements when specified
+3. Consider authorization rates, fees, and merchant preferences
+4. Use historical lessons to inform decisions
+5. Provide clear reasoning for your choice
+
+DECISION FACTORS (in order of importance):
+1. Compliance (SCA/3DS requirements)
+2. Authorization success rates
+3. Fee optimization
+4. Merchant preferences
+5. Historical performance
+```
+
+### **Summary: LLM's Value**
+
+The LLM transforms the PSP Router from a simple statistical system into an **intelligent payment expert** that:
+
+1. **🧠 Thinks**: Analyzes complex scenarios with multiple factors
+2. **📋 Applies Rules**: Enforces compliance and business logic
+3. **📚 Learns**: Uses historical lessons and bandit data
+4. **🔧 Adapts**: Handles edge cases and complex scenarios
+5. **📊 Explains**: Provides clear reasoning for decisions
+6. **🛡️ Ensures Safety**: Fallback to bandit when needed
+
+This makes the system capable of handling real-world payment routing scenarios that require expert-level decision making.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
