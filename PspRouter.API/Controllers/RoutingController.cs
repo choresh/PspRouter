@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using PspRouter.Lib;
 using System.Text.Json;
+using System.Reflection;
 
 namespace PspRouter.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class RoutingController : ControllerBase
 {
     private readonly PspRouter.Lib.PspRouter _router;
@@ -87,12 +89,18 @@ public class RoutingController : ControllerBase
     [HttpGet("health")]
     public ActionResult<object> GetHealth()
     {
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+        var informationalVersion = assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
+        
         return Ok(new
         {
             status = "healthy",
             timestamp = DateTime.UtcNow,
             service = "PspRouter.API",
-            version = "1.0.0"
+            version = informationalVersion,
+            assemblyVersion = version,
+            apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0"
         });
     }
 }

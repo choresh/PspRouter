@@ -1,11 +1,47 @@
 using PspRouter.Lib;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.AspNetCore.Mvc.Versioning;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+
+// Configure API versioning
+builder.Services.AddApiVersioning(opt =>
+{
+    opt.DefaultApiVersion = new ApiVersion(1, 0);
+    opt.AssumeDefaultVersionWhenUnspecified = true;
+    opt.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new QueryStringApiVersionReader("version"),
+        new HeaderApiVersionReader("X-Version"),
+        new MediaTypeApiVersionReader("ver")
+    );
+});
+
+builder.Services.AddVersionedApiExplorer(setup =>
+{
+    setup.GroupNameFormat = "'v'VVV";
+    setup.SubstituteApiVersionInUrl = true;
+});
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+    var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+    var informationalVersion = assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
+    
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "PSP Router API",
+        Version = $"v1 ({informationalVersion})",
+        Description = "Payment Service Provider routing API for intelligent transaction routing"
+    });
+});
 
 // Configure PSP Router services
 var configuration = builder.Configuration;
@@ -80,9 +116,9 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
 Console.WriteLine("=== PSP Router API Ready ===");
 Console.WriteLine("API endpoints available at:");
-Console.WriteLine("  POST /api/routing/route - Route a transaction");
-Console.WriteLine("  POST /api/routing/outcome - Update transaction outcome");
-Console.WriteLine("  GET  /api/routing/health - Check service health");
+Console.WriteLine("  POST /api/v1/routing/route - Route a transaction");
+Console.WriteLine("  POST /api/v1/routing/outcome - Update transaction outcome");
+Console.WriteLine("  GET  /api/v1/routing/health - Check service health");
 
 // Get URLs from configuration
 var urls = builder.Configuration["urls"] ?? "http://localhost:5174;https://localhost:7149";
