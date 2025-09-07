@@ -5,7 +5,7 @@ VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PspRouter.Lib", "PspRouter.Lib\PspRouter.Lib.csproj", "{77951511-A0E9-4A70-BC3F-8BFABB19A263}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PspRouter.App", "PspRouter.App\PspRouter.App.csproj", "{990FA884-0B82-45D3-AAE0-E086F156E29A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PspRouter.API", "PspRouter.API\PspRouter.API.csproj", "{990FA884-0B82-45D3-AAE0-E086F156E29A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PspRouter.Tests", "PspRouter.Tests\PspRouter.Tests.csproj", "{00FF3D64-F501-47CF-A517-4C58981B149D}"
 EndProject

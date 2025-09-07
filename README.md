@@ -4,8 +4,8 @@
 Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using **LLM-based decision making**, **multi-armed bandit learning**, and **vector memory**.
 
 ## 🏗 Solution Overview
-- **3-Project Architecture**: Clean separation with Library, Application, and Tests
-- **Generic Host Architecture**: Enterprise-grade .NET hosting with dependency injection
+- **3-Project Architecture**: Clean separation with Library, Web API, and Tests
+- **ASP.NET Core Web API**: RESTful API with Swagger documentation
 - **Configuration Management**: JSON + environment variables with hierarchical config
 - **Deterministic Guardrails**: Capabilities, SCA/3DS, health checks
 - **LLM Decision Engine**: GPT-4 with tool calling and structured responses
@@ -102,7 +102,7 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 ```
 PspRouter/
 ├── PspRouter.Lib/           # Core business logic library
-├── PspRouter.App/           # Console application
+├── PspRouter.API/           # ASP.NET Core Web API
 ├── PspRouter.Tests/         # Unit tests
 ├── PspRouter.sln           # Solution file
 ├── README.md               # Documentation
@@ -121,11 +121,12 @@ PspRouter/
 - `CapabilityMatrix.cs` – Deterministic PSP support rules (method→PSP gating)
 - `PspRouter.Lib.csproj` – .NET 8 library with core dependencies (`Npgsql`, `OpenAI`, `Pgvector`, `Microsoft.Extensions.Logging.Abstractions`)
 
-### 🚀 **PspRouter.App** (Console Application)
-- `Program.cs` – **Generic Host** application with dependency injection, configuration, and service registration
+### 🚀 **PspRouter.API** (ASP.NET Core Web API)
+- `Program.cs` – **ASP.NET Core** application with dependency injection, configuration, and service registration
+- `Controllers/RoutingController.cs` – REST API endpoints for routing transactions and updating outcomes
 - `Dummies.cs` – Mock implementations for local testing and development
 - `appsettings.json` – Configuration file with logging and PSP router settings
-- `PspRouter.App.csproj` – .NET 8 console app with Generic Host dependencies (`Microsoft.Extensions.Hosting`, `Microsoft.Extensions.Configuration`, etc.)
+- `PspRouter.API.csproj` – .NET 8 Web API with ASP.NET Core dependencies (`Microsoft.AspNetCore.OpenApi`, `Swashbuckle.AspNetCore`, etc.)
 
 ### 🧪 **PspRouter.Tests** (Unit Tests)
 - `UnitTest1.cs` – Test cases for core functionality (CapabilityMatrix, Bandit algorithms)
@@ -144,11 +145,12 @@ PspRouter/
 - **NuGet Package Ready**: Can be packaged and distributed
 - **Framework Agnostic**: No hosting dependencies, pure business logic
 
-### **🚀 PspRouter.App (Console Application)**
-- **Generic Host Integration**: Enterprise-grade hosting with DI and configuration
-- **Production Ready**: Structured logging, graceful shutdown, environment support
-- **Flexible Deployment**: Can be deployed as console app, service, or container
-- **Clean Architecture**: Minimal, focused application that hosts the router services
+### **🚀 PspRouter.API (ASP.NET Core Web API)**
+- **RESTful API**: Clean HTTP endpoints for routing transactions and updating outcomes
+- **Swagger Documentation**: Interactive API documentation with OpenAPI specification
+- **Production Ready**: Structured logging, health checks, environment support
+- **Flexible Deployment**: Can be deployed as web app, service, or container
+- **Clean Architecture**: Minimal, focused API that hosts the router services
 
 ### **🧪 PspRouter.Tests (Unit Tests)**
 - **Comprehensive Coverage**: Tests for all core business logic
@@ -161,7 +163,7 @@ PspRouter/
 ```bash
 # 1. Develop core logic in PspRouter.Lib
 # 2. Test with PspRouter.Tests
-# 3. Integrate and demo with PspRouter.App
+# 3. Integrate and demo with PspRouter.API
 # 4. Package library for distribution
 ```
 
@@ -699,18 +701,18 @@ dotnet build
 # Run tests
 dotnet test
 
-# Run the application
-dotnet run --project PspRouter.App
+# Run the API
+dotnet run --project PspRouter.API
 
 # Run with specific environment
-dotnet run --project PspRouter.App --environment Production
+dotnet run --project PspRouter.API --environment Production
 
 # Run with custom configuration
-dotnet run --project PspRouter.App --configuration Release
+dotnet run --project PspRouter.API --configuration Release
 
 # Build specific project
 dotnet build PspRouter.Lib
-dotnet build PspRouter.App
+dotnet build PspRouter.API
 dotnet build PspRouter.Tests
 
 # Run tests for specific project
@@ -719,68 +721,201 @@ dotnet test PspRouter.Tests
 
 ### Expected Output
 ```
-=== Enhanced PSP Router Demo ===
+=== PSP Router API Ready ===
+API endpoints available at:
+  POST /api/routing/route - Route a transaction
+  POST /api/routing/outcome - Update transaction outcome
+  GET  /api/routing/health - Check service health
+  Swagger UI: https://localhost:7xxx/swagger
 
-This demo showcases the complete PSP routing system with:
-• LLM-based intelligent routing
-• Multi-armed bandit learning
-• Vector memory for lessons
-• Comprehensive logging and monitoring
-• Real PostgreSQL database integration
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: https://localhost:7000
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5000
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+```
 
-Processing test transactions...
+### API Endpoints
 
---- Transaction 1 ---
-Merchant: M001, Amount: 150.00 USD, Method: Card
-Decision: Adyen
-Reasoning: Selected Adyen based on high authorization rate and merchant preference for low fees
-Method: llm
-Outcome: ✓ Authorized - Fee: $3.30 - Time: 1200ms
-✓ Lesson added to memory
+#### Route a Transaction
+```bash
+POST /api/routing/route
+Content-Type: application/json
 
---- Transaction 2 ---
-Merchant: M002, Amount: 75.50 GBP, Method: Card
-Decision: Stripe
-Reasoning: Selected Stripe for GBP transactions with good authorization rates
-Method: llm
-Outcome: ✗ Declined - Fee: $1.81 - Time: 800ms
-✓ Lesson added to memory
+{
+  "transaction": {
+    "merchantId": "M001",
+    "country": "US",
+    "region": "IL",
+    "currency": "USD",
+    "amount": 150.00,
+    "method": "Card",
+    "scheme": "Visa",
+    "scaRequired": false,
+    "riskScore": 15,
+    "bin": "411111"
+  },
+  "candidates": [
+    {
+      "name": "Adyen",
+      "available": true,
+      "health": "green",
+      "authRate30d": 0.89,
+      "latencyMs": 50,
+      "feeBps": 200,
+      "supports3DS": true,
+      "supportsRefunds": true
+    }
+  ],
+  "preferences": {
+    "prefer_low_fees": "true"
+  },
+  "statistics": {
+    "Adyen_USD_Visa_auth": 0.89,
+    "Stripe_USD_Visa_auth": 0.87
+  }
+}
+```
 
-[... continues for 5 transactions ...]
+#### Update Transaction Outcome
+```bash
+POST /api/routing/outcome
+Content-Type: application/json
 
-=== Memory Search Demo ===
-Top memory results:
-score=0.892 key=lesson_1_20241201120000 meta_candidate=Adyen
-Transaction M001|USD|Card: Adyen succeeded with 1200ms processing time
----
+{
+  "decisionId": "decision-123",
+  "pspName": "Adyen",
+  "authorized": true,
+  "transactionAmount": 150.00,
+  "feeAmount": 3.30,
+  "processingTimeMs": 1200,
+  "riskScore": 15,
+  "processedAt": "2024-12-01T12:00:00Z",
+  "errorCode": null,
+  "errorMessage": null
+}
+```
 
-=== Learning Summary ===
-The bandit algorithm has been updated with transaction outcomes.
-Future routing decisions will incorporate this learning.
-Memory has been populated with transaction lessons for semantic search.
+#### Check Service Health
+```bash
+GET /api/routing/health
 
-=== Key Features Demonstrated ===
-✓ LLM-based routing with structured JSON responses
-✓ Multi-armed bandit learning (contextual epsilon-greedy)
-✓ Vector memory for semantic lesson storage
-✓ Comprehensive logging and monitoring
-✓ Realistic transaction outcome simulation
-✓ Graceful fallback to deterministic scoring
-✓ Reward-based learning from transaction outcomes
-
-=== Demo Complete ===
-The Enhanced PSP Router is ready for production deployment!
+Response:
+{
+  "status": "healthy",
+  "timestamp": "2024-12-01T12:00:00Z",
+  "service": "PspRouter.API",
+  "version": "1.0.0"
+}
 ```
 
 ## 📋 Usage Examples
 
-### Basic Routing
+### 🚀 API Usage
+
+#### Start the API
+```bash
+# Run the API
+dotnet run --project PspRouter.API
+
+# Access Swagger UI
+https://localhost:7000/swagger
+```
+
+#### Test API Endpoints
+```bash
+# Test routing endpoint
+curl -X POST https://localhost:7000/api/routing/route \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction": {
+      "merchantId": "M001",
+      "country": "US",
+      "region": "IL",
+      "currency": "USD",
+      "amount": 150.00,
+      "method": "Card",
+      "scheme": "Visa",
+      "scaRequired": false,
+      "riskScore": 15,
+      "bin": "411111"
+    },
+    "candidates": [
+      {
+        "name": "Adyen",
+        "available": true,
+        "health": "green",
+        "authRate30d": 0.89,
+        "latencyMs": 50,
+        "feeBps": 200,
+        "supports3DS": true,
+        "supportsRefunds": true
+      }
+    ]
+  }'
+
+# Test health endpoint
+curl https://localhost:7000/api/routing/health
+
+# Update transaction outcome
+curl -X POST https://localhost:7000/api/routing/outcome \
+  -H "Content-Type: application/json" \
+  -d '{
+    "decisionId": "decision-123",
+    "pspName": "Adyen",
+    "authorized": true,
+    "transactionAmount": 150.00,
+    "feeAmount": 3.30,
+    "processingTimeMs": 1200,
+    "riskScore": 15,
+    "processedAt": "2024-12-01T12:00:00Z"
+  }'
+```
+
+#### PowerShell Examples
+```powershell
+# Test routing endpoint
+Invoke-RestMethod -Uri "https://localhost:7000/api/routing/route" -Method POST -ContentType "application/json" -Body '{
+  "transaction": {
+    "merchantId": "M001",
+    "country": "US",
+    "region": "IL", 
+    "currency": "USD",
+    "amount": 150.00,
+    "method": "Card",
+    "scheme": "Visa",
+    "scaRequired": false,
+    "riskScore": 15,
+    "bin": "411111"
+  },
+  "candidates": [
+    {
+      "name": "Adyen",
+      "available": true,
+      "health": "green",
+      "authRate30d": 0.89,
+      "latencyMs": 50,
+      "feeBps": 200,
+      "supports3DS": true,
+      "supportsRefunds": true
+    }
+  ]
+}'
+
+# Test health endpoint
+Invoke-RestMethod -Uri "https://localhost:7000/api/routing/health" -Method GET
+```
+
+### 📚 Library Usage
+
+#### Basic Routing
 ```csharp
 var router = new PspRouter(chatClient, healthProvider, feeProvider, tools, bandit, memory, logger);
 var decision = await router.DecideAsync(context, cancellationToken);
 ```
 
-### Learning from Outcomes
+#### Learning from Outcomes
 ```csharp
 var outcome = new TransactionOutcome(/* transaction results */);
 router.UpdateReward(decision, outcome);
@@ -1093,10 +1228,13 @@ Makes routing decision using LLM or fallback logic.
 ##### `UpdateReward(RouteDecision, TransactionOutcome)`
 Updates bandit learning with transaction outcome.
 
-### 🚀 PspRouter.App (Console Application)
+### 🚀 PspRouter.API (ASP.NET Core Web API)
 
 #### `Program.cs`
-Generic Host application with dependency injection and service registration.
+ASP.NET Core application with dependency injection and service registration.
+
+#### `Controllers/RoutingController.cs`
+REST API controller with endpoints for routing transactions and updating outcomes.
 
 #### `DummyHealthProvider` & `DummyFeeProvider`
 Mock implementations for local testing and development.
@@ -1557,9 +1695,9 @@ The PSP Router has been successfully restructured into a professional 3-project 
 ### **📈 Next Steps:**
 1. **Package Library**: Create NuGet package for distribution
 2. **Add More Tests**: Expand test coverage for all components
-3. **Create Web API**: Build ASP.NET Core API using the library
-4. **Add Monitoring**: Integrate with Application Insights or Prometheus
-5. **Documentation**: Add XML documentation for public APIs
+3. **Add Monitoring**: Integrate with Application Insights or Prometheus
+4. **Documentation**: Add XML documentation for public APIs
+5. **Authentication**: Add API authentication and authorization
 
 ---
 

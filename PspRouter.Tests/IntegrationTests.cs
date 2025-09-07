@@ -1,5 +1,6 @@
 using PspRouter.Lib;
 using Microsoft.Extensions.Logging;
+using Xunit;
 
 namespace PspRouter.Tests;
 
@@ -12,9 +13,9 @@ public class IntegrationTests
         // with LLM-based intelligent routing, bandit learning, and vector memory
         
         // Arrange - Create mock services
-        var healthProvider = new PspRouter.App.DummyHealthProvider();
-        var feeProvider = new PspRouter.App.DummyFeeProvider();
-        var chatClient = new PspRouter.App.DummyChatClient();
+        var healthProvider = new PspRouter.API.DummyHealthProvider();
+        var feeProvider = new PspRouter.API.DummyFeeProvider();
+        var chatClient = new PspRouter.API.DummyChatClient();
         var memory = new MockVectorMemory();
         var logger = new MockLogger<PspRouter.Lib.PspRouter>();
         var bandit = new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: new MockLogger<ContextualEpsilonGreedyBandit>());

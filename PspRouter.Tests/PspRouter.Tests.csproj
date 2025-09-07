@@ -20,7 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PspRouter.Lib\PspRouter.Lib.csproj" />
-    <ProjectReference Include="..\PspRouter.App\PspRouter.App.csproj" />
+    <ProjectReference Include="..\PspRouter.API\PspRouter.API.csproj" />
   </ItemGroup>
 
 </Project>
