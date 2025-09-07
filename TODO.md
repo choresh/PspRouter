@@ -8,86 +8,38 @@ This document outlines all the components that need to be implemented or replace
 ## 📅 **Implementation Timeline & Next Stages**
 
 ### **📋 Implementation Priority Order**
-1. **CRITICAL FIRST**: Bandit Statistics Persistence & Recovery (Item #4) - Production blocker
-2. **Phase 1 Core**: Environment Configuration (Item #1) → Database Setup (Item #2) → Vector Memory Integration (Item #3)
+1. **🚨 CRITICAL FIRST**: Bandit Statistics Persistence & Recovery (Item #1) - Production blocker
+2. **Phase 1 Core**: Environment Configuration (Item #2) → Database Setup (Item #3) → Vector Memory Integration (Item #4)
 3. **Phase 2 Integration**: Health Provider (Item #5) → Fee Provider (Item #6) → Service Registration (Item #7)
-4. **Phase 3 Production**: Monitoring (Item #11) → Security (Item #14) → Performance Testing (Item #16)
-5. **Phase 4 Advanced**: ML Enhancements (Item #21) → Analytics (Item #22) → Multi-Region (Item #23)
+4. **Phase 3 Real Data**: Historical Statistics (Item #8) → Merchant Preferences (Item #9) → Transaction Segmentation (Item #10)
+5. **Phase 4 Production**: Monitoring (Item #11) → Caching (Item #12) → Rate Limiting (Item #13) → Security (Item #14)
+6. **Phase 5 Testing**: Integration Tests (Item #15) → Performance Testing (Item #16) → Data Quality Tests (Item #17)
+7. **Phase 6 Deployment**: Containerization (Item #18) → CI/CD Pipeline (Item #19) → Configuration Management (Item #20)
+8. **Phase 7 Advanced**: ML Enhancements (Item #21) → Analytics (Item #22) → Multi-Region (Item #23)
 
 ### **⚠️ Critical Dependencies**
-- **Bandit Persistence** must be implemented FIRST - it's blocking production use
-- **Database Setup** must be complete before bandit persistence
+- **🚨 Item #1 (Bandit Persistence) MUST be implemented FIRST** - it's blocking production use
+- **Database Setup** must be complete before bandit persistence and historical statistics
 - **Environment Configuration** must be done before any real integrations
 - **Vector Memory Integration** can be done in parallel with bandit persistence
+- **Historical Statistics** (Item #8) depends on Database Setup and transaction_outcomes table
+- **Health/Fee Providers** must be implemented before real PSP integrations
+- **Service Registration** must be updated after implementing new providers
+- **Monitoring** should be implemented before production deployment
 
 ### **🎯 Success Criteria**
-- **Week 2**: System can restart without losing learning progress
-- **Week 3**: All core functionality working with real data
-- **Week 6**: Real PSP integrations working reliably
-- **Week 8**: Production-ready with monitoring and security
-- **Week 12**: Enterprise-grade system with advanced features
+- **Week 2**: System can restart without losing learning progress (Bandit Persistence)
+- **Week 3**: All core functionality working with real data (Phases 1-2 complete)
+- **Week 4**: Real statistics and merchant preferences working (Phase 3 complete)
+- **Week 6**: Real PSP integrations working reliably (Phase 4 production features)
+- **Week 8**: Production-ready with monitoring, security, and testing (Phases 5-6 complete)
+- **Week 12**: Enterprise-grade system with advanced features (Phase 7 complete)
 
 ---
 
 ## 🚨 **CRITICAL - Phase 1: Core Functionality**
 
-### 1. **Environment Configuration** ⚠️ **REQUIRED**
-- [ ] Set up environment variables:
-  ```bash
-  OPENAI_API_KEY=sk-your-openai-key-here
-  PGVECTOR_CONNSTR=Host=localhost;Username=postgres;Password=postgres;Database=psp_router
-  ```
-- [ ] Create `.env` file or configure in your deployment environment
-- [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
-
-### 2. **Database Setup** ⚠️ **REQUIRED**
-- [ ] Install PostgreSQL with pgvector extension
-- [ ] Run `setup-database.sql` to create database schema
-- [ ] Verify database connection in `Program.cs`
-- [ ] Test vector operations with sample data
-
-### 3. **Vector Memory Integration** ⚠️ **INCOMPLETE**
-**File:** `PspRouter.Lib/Router.cs` (lines 102-128)
-
-**Current Issue:** `GetRelevantLessonsAsync` method returns empty list
-
-**Important Clarifications:**
-- **Vector DB is FOR the LLM**: Used exclusively to enhance LLM decision-making
-- **NOT a Fallback**: The deterministic fallback system does not use vector memory
-- **Memory vs. Logic**: Vector DB provides historical context, not routing logic
-
-**Implementation Required:**
-```csharp
-private async Task<List<string>> GetRelevantLessonsAsync(RouteContext ctx, CancellationToken ct)
-{
-    if (_memory == null) return new List<string>();
-
-    try
-    {
-        // TODO: Implement embedding integration
-        // 1. Create query embedding using OpenAIEmbeddings
-        // 2. Search vector memory with embedding
-        // 3. Return top-k relevant lessons
-        
-        var query = $"PSP routing for {ctx.Tx.Currency} {ctx.Tx.Method} {ctx.Tx.Scheme} merchant {ctx.Tx.MerchantCountry}";
-        
-        // IMPLEMENTATION NEEDED:
-        // var embeddings = _embeddingsService; // Get from DI
-        // var queryEmbedding = await embeddings.CreateEmbeddingAsync(query, ct);
-        // var results = await _memory.SearchAsync(queryEmbedding, k: 5, ct);
-        // return results.Select(r => r.text).ToList();
-        
-        return new List<string>();
-    }
-    catch (Exception ex)
-    {
-        _logger?.LogError(ex, "Failed to retrieve relevant lessons from memory");
-        return new List<string>();
-    }
-}
-```
-
-### 4. **Bandit Statistics Persistence & Recovery** ❌ **MISSING**
+### 1. **Bandit Statistics Persistence & Recovery** ❌ **MISSING** 🚨 **CRITICAL FIRST**
 **Files:** `PspRouter.Lib/Bandit.cs`, `PspRouter.API/Controllers/RoutingController.cs`
 
 **Current Issue:** Bandit statistics are lost on server restart - no persistence or recovery
@@ -185,6 +137,62 @@ CREATE TABLE IF NOT EXISTS transaction_outcomes (
     currency TEXT,
     payment_method TEXT
 );
+```
+
+### 2. **Environment Configuration** ⚠️ **REQUIRED**
+- [ ] Set up environment variables:
+  ```bash
+  OPENAI_API_KEY=sk-your-openai-key-here
+  PGVECTOR_CONNSTR=Host=localhost;Username=postgres;Password=postgres;Database=psp_router
+  ```
+- [ ] Create `.env` file or configure in your deployment environment
+- [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
+
+### 3. **Database Setup** ⚠️ **REQUIRED**
+- [ ] Install PostgreSQL with pgvector extension
+- [ ] Run `setup-database.sql` to create database schema
+- [ ] Verify database connection in `Program.cs`
+- [ ] Test vector operations with sample data
+
+### 4. **Vector Memory Integration** ⚠️ **INCOMPLETE**
+**File:** `PspRouter.Lib/Router.cs` (lines 102-128)
+
+**Current Issue:** `GetRelevantLessonsAsync` method returns empty list
+
+**Important Clarifications:**
+- **Vector DB is FOR the LLM**: Used exclusively to enhance LLM decision-making
+- **NOT a Fallback**: The deterministic fallback system does not use vector memory
+- **Memory vs. Logic**: Vector DB provides historical context, not routing logic
+
+**Implementation Required:**
+```csharp
+private async Task<List<string>> GetRelevantLessonsAsync(RouteContext ctx, CancellationToken ct)
+{
+    if (_memory == null) return new List<string>();
+
+    try
+    {
+        // TODO: Implement embedding integration
+        // 1. Create query embedding using OpenAIEmbeddings
+        // 2. Search vector memory with embedding
+        // 3. Return top-k relevant lessons
+        
+        var query = $"PSP routing for {ctx.Tx.Currency} {ctx.Tx.Method} {ctx.Tx.Scheme} merchant {ctx.Tx.MerchantCountry}";
+        
+        // IMPLEMENTATION NEEDED:
+        // var embeddings = _embeddingsService; // Get from DI
+        // var queryEmbedding = await embeddings.CreateEmbeddingAsync(query, ct);
+        // var results = await _memory.SearchAsync(queryEmbedding, k: 5, ct);
+        // return results.Select(r => r.text).ToList();
+        
+        return new List<string>();
+    }
+    catch (Exception ex)
+    {
+        _logger?.LogError(ex, "Failed to retrieve relevant lessons from memory");
+        return new List<string>();
+    }
+}
 ```
 
 ---
@@ -550,23 +558,20 @@ public class SegmentAnalytics
 
 ---
 
-
----
-
 ## 📝 **Implementation Notes**
 
-### 10. **Priority Levels:**
+### **Priority Levels:**
 - 🚨 **CRITICAL**: Required for basic functionality
 - ⚠️ **HIGH**: Required for production use
 - ❌ **MEDIUM**: Important for scalability
 - 📈 **LOW**: Nice-to-have features
 
-### 11. **Dependencies:**
+### **Dependencies:**
 - Phase 1 must be completed before Phase 2
 - Phase 2 must be completed before Phase 3
 - Phases 4-7 can be implemented in parallel
 
-### 12. **Testing Strategy:**
+### **Testing Strategy:**
 - Unit tests for each new implementation
 - Integration tests with real PSP APIs (test accounts)
 - End-to-end tests for complete routing flow
@@ -576,13 +581,13 @@ public class SegmentAnalytics
 
 ## 🔗 **Useful Resources**
 
-### 13. **PSP API Documentation:**
+### **PSP API Documentation:**
 - [Adyen API](https://docs.adyen.com/api-explorer/)
 - [Stripe API](https://stripe.com/docs/api)
 - [PayPal API](https://developer.paypal.com/docs/api/)
 - [Klarna API](https://developers.klarna.com/api/)
 
-### 14. **Technical References:**
+### **Technical References:**
 - [pgvector Documentation](https://github.com/pgvector/pgvector)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [ASP.NET Core Best Practices](https://docs.microsoft.com/en-us/aspnet/core/)
@@ -597,19 +602,19 @@ public class SegmentAnalytics
 
 ## 🛠 **Implementation Tasks & Guidance**
 
-### 15. **🔄 Replace Dummy Implementations**
+### **🔄 Replace Dummy Implementations**
 - [ ] Implement `IHealthProvider` and `IFeeQuoteProvider` with your metrics/config
 - [ ] Swap in your own stats for `AuthRate30d` and pass them in `RouteContext`
 - [ ] Replace `DummyHealthProvider` and `DummyFeeProvider` with real implementations
 - [ ] Update service registration in `Program.cs`
 
-### 16. **🔧 System Tuning & Configuration**
+### **🔧 System Tuning & Configuration**
 - [ ] Adjust embedding model & `vector(N)` dimension in `MemoryPgVector.cs` to match your chosen model
 - [ ] Configure model name in `OpenAIChatClient` (default: `gpt-4.1`)
 - [ ] Tune bandit epsilon values for optimal exploration/exploitation balance
 - [ ] Configure logging levels for production vs development environments
 
-### 17. **📊 Monitoring & Observability Setup**
+### **📊 Monitoring & Observability Setup**
 
 #### **Logging Configuration**
 - [ ] **Information**: Routing decisions, learning updates
@@ -629,7 +634,7 @@ public class SegmentAnalytics
 - [ ] Implement health check endpoints for all PSPs
 - [ ] Set up performance dashboards
 
-### 18. **📦 Packaging & Distribution**
+### **📦 Packaging & Distribution**
 
 #### **Creating NuGet Package**
 - [ ] Build the library in Release mode
@@ -659,7 +664,7 @@ The library has minimal external dependencies:
 - `Pgvector` - Vector database support
 - `Microsoft.Extensions.Logging.Abstractions` - Logging interfaces
 
-### 19. **🔧 Customization & Extensions**
+### **🔧 Customization & Extensions**
 
 #### **External Bandit Libraries**
 For production use, consider integrating with industry-standard libraries:
@@ -678,7 +683,7 @@ For production use, consider integrating with industry-standard libraries:
 - [ ] Test reward function with historical data
 - [ ] Validate reward function performance
 
-### 20. **📈 Performance Optimization**
+### **📈 Performance Optimization**
 
 #### **Caching Strategy**
 - [ ] **PSP Health**: Cache health status for 30 seconds
@@ -702,7 +707,7 @@ For production use, consider integrating with industry-standard libraries:
   "Host=localhost;Username=postgres;Password=postgres;Database=psp_router;Pooling=true;MinPoolSize=5;MaxPoolSize=20"
   ```
 
-### 21. **🚨 Troubleshooting Guide**
+### **🚨 Troubleshooting Guide**
 
 #### **Common Issues & Solutions**
 
@@ -734,7 +739,7 @@ Error: permission denied for table psp_lessons
 - [ ] Enable debug logging: `export DOTNET_ENVIRONMENT=Development`
 - [ ] Run with verbose logging: `dotnet run --verbosity detailed`
 
-### 22. **🔒 Security Implementation**
+### **🔒 Security Implementation**
 
 #### **API Key Security**
 - [ ] Never commit API keys to version control
@@ -752,7 +757,7 @@ Error: permission denied for table psp_lessons
 - [ ] Implement rate limiting
 - [ ] Monitor for suspicious activity
 
-### 23. **💾 Backup and Recovery Setup**
+### **💾 Backup and Recovery Setup**
 
 #### **Database Backup**
 - [ ] Create backup script: `pg_dump -U postgres -h localhost psp_router > psp_router_backup.sql`
@@ -765,4 +770,3 @@ Error: permission denied for table psp_lessons
   ```
 
 ---
-
