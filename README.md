@@ -38,26 +38,26 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - **LLM Integration**: Used exclusively for LLM-based routing decisions (not fallback)
 - **System Memory**: Acts as the "memory" of the system, helping the LLM make more informed decisions based on past experience, similar to how a human expert would recall similar past situations when making routing decisions
 
-### 🏗️ **Generic Host Architecture**
-- **Enterprise-Grade Hosting**: Built on .NET Generic Host for production deployment
+### 🏗️ **ASP.NET Core Web API Architecture**
+- **Enterprise-Grade Web API**: Built on ASP.NET Core for production deployment
 - **Dependency Injection**: Automatic service lifetime management and disposal
 - **Configuration Management**: Hierarchical configuration with JSON, environment variables, and command line
 - **Service Registration**: Clean separation of concerns with proper service lifetimes
-- **Graceful Shutdown**: Proper application lifecycle management
-- **Extensibility**: Easy to add hosted services, health checks, and background tasks
+- **Controller-Based**: RESTful API endpoints with proper HTTP semantics
+- **Extensibility**: Easy to add middleware, filters, and background services
 
 ### 📊 **Comprehensive Monitoring**
 - **Structured Logging**: Detailed logging with Microsoft.Extensions.Logging
 - **Performance Metrics**: Processing time, success rates, fee optimization
 - **Audit Trail**: Complete decision history with reasoning
 - **Error Tracking**: Comprehensive error handling and reporting
-- **Host Integration**: Logging integrated with .NET hosting infrastructure
+- **Web API Integration**: Logging integrated with ASP.NET Core infrastructure
 
 ## 🏗 Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    .NET Generic Host                            │
+│                    ASP.NET Core Web API                        │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │              Dependency Injection Container             │   │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │   │
@@ -73,9 +73,15 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
                               │
                               ▼
 ┌─────────────────┐    ┌──────────────────┐     ┌─────────────────┐
-│   Transaction   │───▶│   PSP Router     │───▶│   Decision      │
-│   Input         │    │   (Scoped)       │     │   Output        │
+│   HTTP Request  │───▶│  Routing         │───▶│   HTTP Response │
+│   (JSON)        │    │  Controller      │     │   (JSON)        │
 └─────────────────┘    └──────────────────┘     └─────────────────┘
+                              │
+                              ▼
+                    ┌──────────────────┐
+                    │   PSP Router     │
+                    │   (Scoped)       │
+                    └──────────────────┘
                               │
                               ▼
                     ┌──────────────────┐
@@ -660,8 +666,8 @@ OpenAI embeddings are the **"translation layer"** that converts human language i
 ### 🔄 System Integration Flow
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Generic Host  │───▶│   Dependency     │───▶│   Service       │
-│   Application   │    │   Injection      │    │   Registration  │
+│   ASP.NET Core  │───▶│   Dependency     │───▶│   Service       │
+│   Web API       │    │   Injection      │    │   Registration  │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                                         │
                                                         ▼
@@ -672,8 +678,8 @@ OpenAI embeddings are the **"translation layer"** that converts human language i
         │                        │
         ▼                        ▼
 ┌─────────────────┐    ┌──────────────────┐
-│   Environment   │    │   Graceful       │
-│   Variables     │    │   Shutdown       │
+│   Environment   │    │   HTTP Request   │
+│   Variables     │    │   Processing     │
 └─────────────────┘    └──────────────────┘
 ```
 
@@ -715,7 +721,7 @@ OpenAI embeddings are the **"translation layer"** that converts human language i
 - **🧠 LLM Decision Process Flow**: Details how the LLM analyzes transactions and makes intelligent decisions
 - **🎰 Bandit Learning Flow**: Illustrates the contextual bandit learning and arm selection process
 - **🧠 Vector Memory Flow**: Shows how lessons are stored and retrieved using semantic search
-- **🔄 System Integration Flow**: Demonstrates the Generic Host architecture and dependency injection
+- **🔄 System Integration Flow**: Demonstrates the ASP.NET Core Web API architecture and dependency injection
 - **🎯 Decision Tree Flow**: Provides a high-level view of the decision logic and fallback mechanisms
 
 ## 🚀 Quick Start
@@ -734,18 +740,18 @@ This solution uses a clean 3-project architecture, providing:
 - **Deployment Flexibility**: Application can be deployed independently
 - **Professional Structure**: Industry-standard .NET solution organization
 
-### 🏗️ **Generic Host Benefits**
-The application uses .NET Generic Host, providing:
+### 🏗️ **ASP.NET Core Web API Benefits**
+The application uses ASP.NET Core Web API, providing:
 - **Automatic Dependency Injection**: Services are automatically registered and managed
 - **Configuration Management**: JSON + environment variables with hierarchical config
 - **Structured Logging**: Built-in logging with multiple providers
-- **Graceful Shutdown**: Proper application lifecycle management
-- **Production Ready**: Enterprise-grade hosting infrastructure
-- **Extensibility**: Easy to add hosted services, health checks, and background tasks
+- **Controller-Based Architecture**: RESTful API endpoints with proper HTTP semantics
+- **Production Ready**: Enterprise-grade web application infrastructure
+- **Extensibility**: Easy to add middleware, filters, and background services
 - **Service Lifetime Management**: Automatic disposal and cleanup of resources
 - **Environment Support**: Development, Staging, Production configurations
 - **Command Line Integration**: Built-in support for command line arguments
-- **Hosting Flexibility**: Can be deployed as console app, Windows service, or container
+- **Deployment Flexibility**: Can be deployed as web app, service, or container
 
 ### 1. Database Setup
 
