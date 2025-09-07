@@ -273,16 +273,116 @@ builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>(
 ### 8. **Historical Statistics Implementation** ❌ **HARDCODED**
 **Current Issue:** `AuthRate30d` values are hardcoded in test data
 
-**Implementation Required:**
+#### **🔍 What Currently Exists:**
+
+**A. Hardcoded Values in Tests:**
 ```csharp
-public class StatisticsProvider
+// File: PspRouter.Tests/IntegrationTests.cs (lines 119-125)
+var baseRate = psp switch
 {
+    "Adyen" => 0.89,    // ← HARDCODED: 89% auth rate
+    "Stripe" => 0.87,   // ← HARDCODED: 87% auth rate  
+    "Klarna" => 0.85,   // ← HARDCODED: 85% auth rate
+    _ => 0.80           // ← HARDCODED: 80% default
+};
+```
+
+**B. Usage in Router Logic:**
+```csharp
+// File: PspRouter.Lib/Router.cs (line 187)
+// Deterministic fallback scoring uses AuthRate30d
+var best = candidates.OrderByDescending(c =>
+    c.AuthRate30d - (c.FeeBps/10000.0) - (double)(c.FixedFee/Math.Max(tx.Amount,1m))
+).First();
+
+// File: PspRouter.Lib/Router.cs (lines 200, 207)
+// Decision reasoning includes AuthRate30d
+Reasoning: $"{method} - Auth: {chosen.AuthRate30d:P2}, Fee: {chosen.FeeBps}bps + {chosen.FixedFee:C}",
+Features_Used: new[] { 
+    $"auth={chosen.AuthRate30d:F2}",  // ← Used in decision features
+    $"fee_bps={chosen.FeeBps}",
+    // ...
+}
+```
+
+**C. LLM Context Integration:**
+```csharp
+// File: PspRouter.Lib/Router.cs (lines 73-79)
+// AuthRate30d is passed to LLM in context
+var contextJson = JsonSerializer.Serialize(new {
+    Transaction = ctx.Tx,
+    Candidates = validCandidates,  // ← Contains AuthRate30d values
+    MerchantPreferences = ctx.MerchantPrefs,
+    SegmentStats = ctx.SegmentStats,
+    RelevantLessons = relevantLessons
+});
+```
+
+#### **🎯 What This Means:**
+- **Current State**: System uses static, unrealistic auth rates (89%, 87%, 85%)
+- **Impact**: Routing decisions are based on fake data, not real PSP performance
+- **Problem**: No learning from actual transaction outcomes
+- **Critical**: Both LLM and deterministic fallback depend on accurate `AuthRate30d`
+
+#### **📍 Where New Code Should Be Used:**
+
+**A. Replace Test Data Generation:**
+```csharp
+// File: PspRouter.Tests/IntegrationTests.cs (line 86)
+// REPLACE THIS:
+candidates.Add(new("Adyen", true, healthStatus, GetRealisticAuthRate(tx, "Adyen"), latency, GetRealisticFeeBps(tx, "Adyen"), true, true));
+
+// WITH THIS:
+var authRates = await _statisticsProvider.GetAuthRates30dAsync(new[] { "Adyen" }, ct);
+candidates.Add(new("Adyen", true, healthStatus, authRates["Adyen"], latency, GetRealisticFeeBps(tx, "Adyen"), true, true));
+```
+
+**B. API Controller Integration:**
+```csharp
+// File: PspRouter.API/Controllers/RoutingController.cs (lines 35-40)
+// ADD BEFORE creating RouteContext:
+var authRates = await _statisticsProvider.GetAuthRates30dAsync(
+    request.Candidates.Select(c => c.Name), 
+    CancellationToken.None);
+
+// UPDATE candidates with real auth rates:
+foreach (var candidate in request.Candidates)
+{
+    if (authRates.ContainsKey(candidate.Name))
+    {
+        // Update AuthRate30d with real data
+        candidate = candidate with { AuthRate30d = authRates[candidate.Name] };
+    }
+}
+```
+
+**C. Service Registration:**
+```csharp
+// File: PspRouter.API/Program.cs (line 54)
+// ADD after existing service registrations:
+builder.Services.AddSingleton<IStatisticsProvider, StatisticsProvider>();
+```
+
+#### **🛠 Implementation Required:**
+```csharp
+public interface IStatisticsProvider
+{
+    Task<Dictionary<string, double>> GetAuthRates30dAsync(
+        IEnumerable<string> psps, 
+        CancellationToken ct);
+}
+
+public class StatisticsProvider : IStatisticsProvider
+{
+    private readonly string _connectionString;
+    private readonly ILogger<StatisticsProvider> _logger;
+
     public async Task<Dictionary<string, double>> GetAuthRates30dAsync(
         IEnumerable<string> psps, 
         CancellationToken ct)
     {
         // TODO: Implement real statistics calculation
-        // - Query transaction database for last 30 days
+        // - Query transaction_outcomes table for last 30 days
         // - Calculate authorization rates per PSP
         // - Return dictionary of PSP -> AuthRate
         
@@ -296,6 +396,14 @@ public class StatisticsProvider
         // return stats;
         
         throw new NotImplementedException("Statistics provider not implemented");
+    }
+    
+    private async Task<double> CalculateAuthRateAsync(string psp, DateTime since, CancellationToken ct)
+    {
+        // TODO: SQL query to calculate auth rate
+        // SELECT COUNT(*) FILTER (WHERE authorized = true) / COUNT(*) as auth_rate
+        // FROM transaction_outcomes 
+        // WHERE psp_name = @psp AND processed_at >= @since
     }
 }
 ```
