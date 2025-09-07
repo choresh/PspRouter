@@ -58,11 +58,111 @@ private async Task<List<string>> GetRelevantLessonsAsync(RouteContext ctx, Cance
 }
 ```
 
+### 4. **Bandit Statistics Persistence & Recovery** ❌ **MISSING**
+**Files:** `PspRouter.Lib/Bandit.cs`, `PspRouter.API/Controllers/RoutingController.cs`
+
+**Current Issue:** Bandit statistics are lost on server restart - no persistence or recovery
+
+**Critical Problems:**
+- ❌ Transaction outcomes are only logged, not stored in database
+- ❌ Bandit statistics exist only in memory
+- ❌ No recovery mechanism on application startup
+- ❌ Server restart = complete loss of learning progress
+
+**Implementation Required:**
+
+#### **A. Transaction Outcome Storage**
+```csharp
+// File: PspRouter.API/Controllers/RoutingController.cs
+[HttpPost("outcome")]
+public async Task<ActionResult> UpdateOutcome([FromBody] TransactionOutcome outcome)
+{
+    try
+    {
+        // TODO: Store in database instead of just logging
+        // await _transactionOutcomeService.StoreAsync(outcome);
+        
+        // TODO: Update bandit learning
+        // await _router.UpdateRewardAsync(decision, outcome);
+        
+        _logger.LogInformation("Transaction outcome: {Outcome}", JsonSerializer.Serialize(outcome));
+        return Ok(new { message = "Outcome recorded successfully" });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error updating transaction outcome");
+        return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+    }
+}
+```
+
+#### **B. Bandit Statistics Persistence**
+```csharp
+// File: PspRouter.Lib/Bandit.cs
+public interface IBanditPersistence
+{
+    Task SaveStatisticsAsync(Dictionary<string, Dictionary<string, (double sum, int count)>> stats);
+    Task<Dictionary<string, Dictionary<string, (double sum, int count)>>> LoadStatisticsAsync();
+    Task RebuildFromTransactionHistoryAsync();
+}
+
+public class DatabaseBanditPersistence : IBanditPersistence
+{
+    // TODO: Implement database persistence
+    // - Save bandit statistics to bandit_stats table
+    // - Load statistics on startup
+    // - Rebuild from transaction_outcomes table
+}
+```
+
+#### **C. Application Startup Recovery**
+```csharp
+// File: PspRouter.API/Program.cs
+public async Task StartAsync()
+{
+    // TODO: Rebuild bandit statistics from database
+    // await _banditPersistence.RebuildFromTransactionHistoryAsync();
+    
+    _logger.LogInformation("Bandit statistics rebuilt from transaction history");
+}
+```
+
+**Database Schema (Already Exists):**
+```sql
+-- ✅ Tables already created in setup-database.sql
+CREATE TABLE IF NOT EXISTS bandit_stats (
+    segment_key TEXT NOT NULL,
+    arm_name TEXT NOT NULL,
+    alpha REAL DEFAULT 1.0,
+    beta REAL DEFAULT 1.0,
+    sum_rewards REAL DEFAULT 0.0,
+    count_pulls INTEGER DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (segment_key, arm_name)
+);
+
+CREATE TABLE IF NOT EXISTS transaction_outcomes (
+    decision_id TEXT PRIMARY KEY,
+    psp_name TEXT NOT NULL,
+    authorized BOOLEAN NOT NULL,
+    transaction_amount DECIMAL(10,2) NOT NULL,
+    fee_amount DECIMAL(10,2) NOT NULL,
+    processing_time_ms INTEGER NOT NULL,
+    risk_score INTEGER NOT NULL,
+    processed_at TIMESTAMP NOT NULL,
+    error_code TEXT,
+    error_message TEXT,
+    merchant_id TEXT,
+    currency TEXT,
+    payment_method TEXT
+);
+```
+
 ---
 
 ## 🔧 **Phase 2: Replace Dummy Implementations**
 
-### 4. **Health Provider Implementation** ❌ **DUMMY**
+### 5. **Health Provider Implementation** ❌ **DUMMY**
 **File:** `PspRouter.API/Dummies.cs` (lines 5-11)
 
 **Current:** Returns hardcoded "green" health status
@@ -92,7 +192,7 @@ public class RealHealthProvider : IHealthProvider
 }
 ```
 
-### 5. **Fee Provider Implementation** ❌ **DUMMY**
+### 6. **Fee Provider Implementation** ❌ **DUMMY**
 **File:** `PspRouter.API/Dummies.cs` (lines 13-19)
 
 **Current:** Returns hardcoded 200 bps + $0.30 fees
@@ -123,7 +223,7 @@ public class RealFeeProvider : IFeeQuoteProvider
 }
 ```
 
-### 6. **Update Service Registration** ⚠️ **REQUIRED**
+### 7. **Update Service Registration** ⚠️ **REQUIRED**
 **File:** `PspRouter.API/Program.cs` (lines 53-54)
 
 **Replace:**
@@ -141,7 +241,7 @@ builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>(
 
 ## 📊 **Phase 3: Real Data Integration**
 
-### 7. **Historical Statistics Implementation** ❌ **HARDCODED**
+### 8. **Historical Statistics Implementation** ❌ **HARDCODED**
 **Current Issue:** `AuthRate30d` values are hardcoded in test data
 
 **Implementation Required:**
@@ -171,7 +271,7 @@ public class StatisticsProvider
 }
 ```
 
-### 8. **Merchant Preferences System** ❌ **EMPTY**
+### 9. **Merchant Preferences System** ❌ **EMPTY**
 **Current Issue:** `MerchantPrefs` and `SegmentStats` are empty
 
 **Implementation Required:**
@@ -193,7 +293,7 @@ public class MerchantPreferencesProvider
 }
 ```
 
-### 9. **Transaction Segmentation** ❌ **MISSING**
+### 10. **Transaction Segmentation** ❌ **MISSING**
 **Implementation Required:**
 ```csharp
 public class SegmentAnalytics
@@ -215,26 +315,26 @@ public class SegmentAnalytics
 
 ## 🏗️ **Phase 4: Production Features**
 
-### 10. **Monitoring & Observability** ❌ **BASIC**
+### 11. **Monitoring & Observability** ❌ **BASIC**
 - [ ] Add structured logging with correlation IDs
 - [ ] Implement health check endpoints for all PSPs
 - [ ] Add metrics collection (authorization rates, response times)
 - [ ] Set up alerting for PSP failures
 - [ ] Add distributed tracing
 
-### 11. **Caching Layer** ❌ **MISSING**
+### 12. **Caching Layer** ❌ **MISSING**
 - [ ] Implement Redis caching for PSP health status
 - [ ] Cache fee calculations with TTL
 - [ ] Cache merchant preferences
 - [ ] Implement cache invalidation strategies
 
-### 12. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
+### 13. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
 - [ ] Add rate limiting for API endpoints
 - [ ] Implement circuit breakers for PSP calls
 - [ ] Add retry policies with exponential backoff
 - [ ] Implement bulkhead pattern for PSP isolation
 
-### 13. **Security Enhancements** ⚠️ **BASIC**
+### 14. **Security Enhancements** ⚠️ **BASIC**
 - [ ] Add API authentication/authorization
 - [ ] Implement request/response encryption
 - [ ] Add input validation and sanitization
@@ -244,7 +344,7 @@ public class SegmentAnalytics
 
 ## 🧪 **Phase 5: Testing & Quality**
 
-### 14. **Integration Tests** ⚠️ **PARTIAL**
+### 15. **Integration Tests** ⚠️ **PARTIAL**
 **File:** `PspRouter.Tests/IntegrationTests.cs`
 
 **Current:** Uses dummy implementations
@@ -255,13 +355,13 @@ public class SegmentAnalytics
 - [ ] Vector memory integration tests
 - [ ] End-to-end routing flow tests
 
-### 15. **Performance Testing** ❌ **MISSING**
+### 16. **Performance Testing** ❌ **MISSING**
 - [ ] Load testing for routing decisions
 - [ ] Stress testing for concurrent requests
 - [ ] Memory usage profiling
 - [ ] Database performance optimization
 
-### 16. **Data Quality Tests** ❌ **MISSING**
+### 17. **Data Quality Tests** ❌ **MISSING**
 - [ ] PSP data validation tests
 - [ ] Fee calculation accuracy tests
 - [ ] Health status consistency tests
@@ -271,19 +371,19 @@ public class SegmentAnalytics
 
 ## 🔄 **Phase 6: Deployment & Operations**
 
-### 17. **Containerization** ❌ **MISSING**
+### 18. **Containerization** ❌ **MISSING**
 - [ ] Create Dockerfile for API
 - [ ] Create docker-compose.yml with PostgreSQL
 - [ ] Add health checks to containers
 - [ ] Configure multi-stage builds
 
-### 18. **CI/CD Pipeline** ❌ **MISSING**
+### 19. **CI/CD Pipeline** ❌ **MISSING**
 - [ ] Set up automated testing pipeline
 - [ ] Add code quality checks (SonarQube)
 - [ ] Implement automated deployment
 - [ ] Add rollback capabilities
 
-### 19. **Configuration Management** ⚠️ **BASIC**
+### 20. **Configuration Management** ⚠️ **BASIC**
 - [ ] Implement configuration validation
 - [ ] Add environment-specific configs
 - [ ] Implement feature flags
@@ -293,19 +393,19 @@ public class SegmentAnalytics
 
 ## 📈 **Phase 7: Advanced Features**
 
-### 20. **Machine Learning Enhancements** ❌ **BASIC**
+### 21. **Machine Learning Enhancements** ❌ **BASIC**
 - [ ] Implement A/B testing framework
 - [ ] Add model performance monitoring
 - [ ] Implement online learning for bandits
 - [ ] Add feature engineering pipeline
 
-### 21. **Analytics & Reporting** ❌ **MISSING**
+### 22. **Analytics & Reporting** ❌ **MISSING**
 - [ ] Implement routing decision analytics
 - [ ] Add PSP performance dashboards
 - [ ] Create merchant-specific reports
 - [ ] Implement cost optimization insights
 
-### 22. **Multi-Region Support** ❌ **MISSING**
+### 23. **Multi-Region Support** ❌ **MISSING**
 - [ ] Implement geographic routing
 - [ ] Add region-specific PSP preferences
 - [ ] Implement data residency compliance
@@ -319,6 +419,7 @@ public class SegmentAnalytics
 1. ✅ Environment configuration
 2. ✅ Database setup
 3. ✅ Vector memory integration
+4. ✅ **Bandit statistics persistence & recovery** (CRITICAL)
 
 ### **Week 2: Real Integrations**
 1. ✅ Health provider implementation
@@ -373,6 +474,21 @@ public class SegmentAnalytics
 
 ---
 
-**Last Updated:** $(date)
+**Last Updated:** December 2024
 **Status:** Ready for implementation
 **Estimated Total Effort:** 4-6 weeks for core functionality, 8-12 weeks for full production system
+
+---
+
+## 🚨 **CRITICAL ISSUE IDENTIFIED**
+
+### **Bandit Statistics Persistence Problem**
+The system currently has a **critical flaw**: bandit learning statistics are lost on every server restart because they exist only in memory. This means:
+
+- ❌ **No learning persistence**: All bandit progress is lost on restart
+- ❌ **No transaction outcome storage**: Outcomes are only logged, not stored
+- ❌ **No recovery mechanism**: System starts with empty statistics every time
+- ❌ **Production blocker**: This makes the system unsuitable for production use
+
+### **Immediate Action Required**
+**Priority 1**: Implement bandit statistics persistence and recovery before any other features. This is now item #4 in the critical Phase 1 tasks.
