@@ -331,6 +331,59 @@ The application uses ASP.NET Core Web API, providing:
 - **Command Line Integration**: Built-in support for command line arguments
 - **Deployment Flexibility**: Can be deployed as web app, service, or container
 
+### 🗄️ **Database Access Strategy: Raw SQL vs Entity Framework**
+This project uses **raw SQL with Npgsql** instead of Entity Framework Core for several critical reasons:
+
+#### **Why Raw SQL is Optimal Here:**
+
+**🚀 Performance-Critical Operations:**
+- **Vector Similarity Search**: Complex pgvector operations require optimized SQL
+- **Analytics Queries**: Aggregation queries need precise control over execution plans
+- **High-Throughput**: Payment routing requires sub-millisecond database response times
+
+**🔧 Specialized Database Features:**
+- **pgvector Extension**: Vector operations (`<=>`, `cosine similarity`) not well-supported in EF
+- **Custom Indexes**: IVFFlat indexes for vector search require direct SQL control
+- **PostgreSQL-Specific**: Advanced features like `FILTER` clauses and window functions
+
+**📊 Complex Analytics Queries:**
+```sql
+-- Example: Calculate authorization rates per PSP
+SELECT 
+    psp_name,
+    COUNT(*) FILTER (WHERE authorized = true) / COUNT(*) as auth_rate,
+    AVG(processing_time_ms) as avg_processing_time
+FROM transaction_outcomes 
+WHERE processed_at >= NOW() - INTERVAL '30 days'
+GROUP BY psp_name;
+```
+
+**⚡ Performance Benefits:**
+- **Direct Control**: No ORM overhead or query translation
+- **Optimized Queries**: Hand-tuned SQL for maximum performance
+- **Connection Pooling**: Direct Npgsql connection management
+- **Vector Operations**: Native pgvector support without abstraction layers
+
+#### **Type Safety Without EF:**
+We maintain type safety through:
+- **Entity Classes (POCOs)**: Strongly-typed data models
+- **Database Context Interface**: Clean abstraction over raw SQL
+- **Parameterized Queries**: SQL injection protection
+- **Compile-Time Checking**: Full IntelliSense and type validation
+
+#### **When EF Would Be Problematic:**
+- **Vector Operations**: EF doesn't understand pgvector syntax
+- **Complex Analytics**: LINQ translation would be inefficient
+- **Performance**: ORM overhead unacceptable for payment processing
+- **Custom Indexes**: EF migrations don't handle specialized indexes well
+
+#### **Best of Both Worlds:**
+- ✅ **Type Safety**: Entity classes provide compile-time checking
+- ✅ **Performance**: Raw SQL gives optimal database performance  
+- ✅ **Flexibility**: Direct access to all PostgreSQL features
+- ✅ **Maintainability**: Clean separation with database context interface
+- ✅ **Security**: Parameterized queries prevent SQL injection
+
 ### 1. Database Setup
 
 #### Install PostgreSQL with pgvector
