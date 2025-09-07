@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public sealed class PspRouter
 {

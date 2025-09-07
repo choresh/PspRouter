@@ -1,4 +1,4 @@
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public interface IHealthProvider
 {

@@ -2,7 +2,7 @@ using Npgsql;
 using Pgvector;
 using System.Text.Json;
 
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public interface IVectorMemory
 {

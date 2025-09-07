@@ -1,4 +1,4 @@
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public enum PaymentMethod { Card, PayPal, KlarnaPayLater }
 public enum CardScheme { Visa, Mastercard, Amex, Unknown }

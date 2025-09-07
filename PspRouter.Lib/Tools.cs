@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public sealed class GetHealthTool : IAgentTool
 {

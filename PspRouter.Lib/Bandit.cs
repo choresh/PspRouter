@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public interface IBandit
 {

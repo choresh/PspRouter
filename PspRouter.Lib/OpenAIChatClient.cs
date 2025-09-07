@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public sealed class OpenAIChatClient : IChatClient
 {

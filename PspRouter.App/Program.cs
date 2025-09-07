@@ -1,5 +1,5 @@
 using System.Text.Json;
-using PspRouter;
+using PspRouter.Lib;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,8 +26,8 @@ class Program
                      ?? "Host=localhost;Username=postgres;Password=postgres;Database=psp_router";
 
                 // === Register Services ===
-                services.AddSingleton<IHealthProvider, DummyHealthProvider>();
-                services.AddSingleton<IFeeQuoteProvider, DummyFeeProvider>();
+                services.AddSingleton<IHealthProvider, PspRouter.App.DummyHealthProvider>();
+                services.AddSingleton<IFeeQuoteProvider, PspRouter.App.DummyFeeProvider>();
                 services.AddSingleton<IChatClient>(provider => 
                     new OpenAIChatClient(apiKey, model: "gpt-4.1"));
                 services.AddSingleton<OpenAIEmbeddings>(provider => 
@@ -41,14 +41,14 @@ class Program
                 });
 
                 // === Register Router as Scoped (for request-based operations) ===
-                services.AddScoped<PspRouter.PspRouter>(provider =>
+                services.AddScoped<PspRouter.Lib.PspRouter>(provider =>
                 {
                     var chat = provider.GetRequiredService<IChatClient>();
                     var health = provider.GetRequiredService<IHealthProvider>();
                     var fees = provider.GetRequiredService<IFeeQuoteProvider>();
                     var bandit = provider.GetRequiredService<IContextualBandit>();
                     var memory = provider.GetRequiredService<IVectorMemory>();
-                    var logger = provider.GetRequiredService<ILogger<PspRouter.PspRouter>>();
+                    var logger = provider.GetRequiredService<ILogger<PspRouter.Lib.PspRouter>>();
                     
                     var tools = new List<IAgentTool>
                     {
@@ -56,7 +56,7 @@ class Program
                         new GetFeeQuoteTool(fees, () => new RouteInput("", "", "", "", 0, PaymentMethod.Card))
                     };
 
-                    return new PspRouter.PspRouter(chat, health, fees, tools, bandit, memory, logger);
+                    return new PspRouter.Lib.PspRouter(chat, health, fees, tools, bandit, memory, logger);
                 });
 
                 // === Register Demo Service ===
@@ -97,7 +97,7 @@ class Program
 /// </summary>
 public class PspRouterDemo
 {
-    private readonly PspRouter.PspRouter _router;
+    private readonly PspRouter.Lib.PspRouter _router;
     private readonly IHealthProvider _health;
     private readonly IFeeQuoteProvider _fees;
     private readonly OpenAIEmbeddings _embed;
@@ -105,7 +105,7 @@ public class PspRouterDemo
     private readonly ILogger<PspRouterDemo> _logger;
 
     public PspRouterDemo(
-        PspRouter.PspRouter router,
+        PspRouter.Lib.PspRouter router,
         IHealthProvider health,
         IFeeQuoteProvider fees,
         OpenAIEmbeddings embed,

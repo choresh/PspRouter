@@ -1,4 +1,4 @@
-namespace PspRouter;
+namespace PspRouter.Lib;
 
 public static class CapabilityMatrix
 {

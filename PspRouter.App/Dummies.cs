@@ -1,4 +1,6 @@
-namespace PspRouter;
+using PspRouter.Lib;
+
+namespace PspRouter.App;
 
 public class DummyHealthProvider : IHealthProvider
 {
