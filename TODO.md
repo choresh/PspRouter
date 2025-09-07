@@ -420,23 +420,23 @@ public class SegmentAnalytics
 
 ## 🎯 **Quick Start Implementation Order**
 
-### **Week 1: Core Setup**
+### 10. **Week 1: Core Setup**
 1. ✅ Environment configuration
 2. ✅ Database setup
 3. ✅ Vector memory integration
 4. ✅ **Bandit statistics persistence & recovery** (CRITICAL)
 
-### **Week 2: Real Integrations**
+### 11. **Week 2: Real Integrations**
 1. ✅ Health provider implementation
 2. ✅ Fee provider implementation
 3. ✅ Service registration updates
 
-### **Week 3: Data Pipeline**
+### 12. **Week 3: Data Pipeline**
 1. ✅ Statistics provider
 2. ✅ Merchant preferences
 3. ✅ Basic monitoring
 
-### **Week 4: Production Readiness**
+### 13. **Week 4: Production Readiness**
 1. ✅ Caching layer
 2. ✅ Security enhancements
 3. ✅ Performance testing
@@ -445,18 +445,18 @@ public class SegmentAnalytics
 
 ## 📝 **Implementation Notes**
 
-### **Priority Levels:**
+### 14. **Priority Levels:**
 - 🚨 **CRITICAL**: Required for basic functionality
 - ⚠️ **HIGH**: Required for production use
 - ❌ **MEDIUM**: Important for scalability
 - 📈 **LOW**: Nice-to-have features
 
-### **Dependencies:**
+### 15. **Dependencies:**
 - Phase 1 must be completed before Phase 2
 - Phase 2 must be completed before Phase 3
 - Phases 4-7 can be implemented in parallel
 
-### **Testing Strategy:**
+### 16. **Testing Strategy:**
 - Unit tests for each new implementation
 - Integration tests with real PSP APIs (test accounts)
 - End-to-end tests for complete routing flow
@@ -466,13 +466,13 @@ public class SegmentAnalytics
 
 ## 🔗 **Useful Resources**
 
-### **PSP API Documentation:**
+### 17. **PSP API Documentation:**
 - [Adyen API](https://docs.adyen.com/api-explorer/)
 - [Stripe API](https://stripe.com/docs/api)
 - [PayPal API](https://developer.paypal.com/docs/api/)
 - [Klarna API](https://developers.klarna.com/api/)
 
-### **Technical References:**
+### 18. **Technical References:**
 - [pgvector Documentation](https://github.com/pgvector/pgvector)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [ASP.NET Core Best Practices](https://docs.microsoft.com/en-us/aspnet/core/)
@@ -555,19 +555,19 @@ Week 9-12: Phase 4-7 (Advanced Features)
 
 ## 🛠 **Implementation Tasks & Guidance**
 
-### **🔄 Replace Dummy Implementations**
+### 19. **🔄 Replace Dummy Implementations**
 - [ ] Implement `IHealthProvider` and `IFeeQuoteProvider` with your metrics/config
 - [ ] Swap in your own stats for `AuthRate30d` and pass them in `RouteContext`
 - [ ] Replace `DummyHealthProvider` and `DummyFeeProvider` with real implementations
 - [ ] Update service registration in `Program.cs`
 
-### **🔧 System Tuning & Configuration**
+### 20. **🔧 System Tuning & Configuration**
 - [ ] Adjust embedding model & `vector(N)` dimension in `MemoryPgVector.cs` to match your chosen model
 - [ ] Configure model name in `OpenAIChatClient` (default: `gpt-4.1`)
 - [ ] Tune bandit epsilon values for optimal exploration/exploitation balance
 - [ ] Configure logging levels for production vs development environments
 
-### **📊 Monitoring & Observability Setup**
+### 21. **📊 Monitoring & Observability Setup**
 
 #### **Logging Configuration**
 - [ ] **Information**: Routing decisions, learning updates
@@ -587,7 +587,7 @@ Week 9-12: Phase 4-7 (Advanced Features)
 - [ ] Implement health check endpoints for all PSPs
 - [ ] Set up performance dashboards
 
-### **📦 Packaging & Distribution**
+### 22. **📦 Packaging & Distribution**
 
 #### **Creating NuGet Package**
 - [ ] Build the library in Release mode
@@ -617,7 +617,7 @@ The library has minimal external dependencies:
 - `Pgvector` - Vector database support
 - `Microsoft.Extensions.Logging.Abstractions` - Logging interfaces
 
-### **🔧 Customization & Extensions**
+### 23. **🔧 Customization & Extensions**
 
 #### **External Bandit Libraries**
 For production use, consider integrating with industry-standard libraries:
@@ -636,7 +636,7 @@ For production use, consider integrating with industry-standard libraries:
 - [ ] Test reward function with historical data
 - [ ] Validate reward function performance
 
-### **📈 Performance Optimization**
+### 24. **📈 Performance Optimization**
 
 #### **Caching Strategy**
 - [ ] **PSP Health**: Cache health status for 30 seconds
@@ -660,7 +660,7 @@ For production use, consider integrating with industry-standard libraries:
   "Host=localhost;Username=postgres;Password=postgres;Database=psp_router;Pooling=true;MinPoolSize=5;MaxPoolSize=20"
   ```
 
-### **🚨 Troubleshooting Guide**
+### 25. **🚨 Troubleshooting Guide**
 
 #### **Common Issues & Solutions**
 
@@ -692,7 +692,7 @@ Error: permission denied for table psp_lessons
 - [ ] Enable debug logging: `export DOTNET_ENVIRONMENT=Development`
 - [ ] Run with verbose logging: `dotnet run --verbosity detailed`
 
-### **🔒 Security Implementation**
+### 26. **🔒 Security Implementation**
 
 #### **API Key Security**
 - [ ] Never commit API keys to version control
@@ -710,7 +710,7 @@ Error: permission denied for table psp_lessons
 - [ ] Implement rate limiting
 - [ ] Monitor for suspicious activity
 
-### **💾 Backup and Recovery Setup**
+### 27. **💾 Backup and Recovery Setup**
 
 #### **Database Backup**
 - [ ] Create backup script: `pg_dump -U postgres -h localhost psp_router > psp_router_backup.sql`
@@ -726,7 +726,7 @@ Error: permission denied for table psp_lessons
 
 ## 🚨 **CRITICAL ISSUE IDENTIFIED**
 
-### **Bandit Statistics Persistence Problem**
+### 28. **Bandit Statistics Persistence Problem**
 The system currently has a **critical flaw**: bandit learning statistics are lost on every server restart because they exist only in memory. This means:
 
 - ❌ **No learning persistence**: All bandit progress is lost on restart
@@ -734,5 +734,5 @@ The system currently has a **critical flaw**: bandit learning statistics are los
 - ❌ **No recovery mechanism**: System starts with empty statistics every time
 - ❌ **Production blocker**: This makes the system unsuitable for production use
 
-### **Immediate Action Required**
+### 29. **Immediate Action Required**
 **Priority 1**: Implement bandit statistics persistence and recovery before any other features. This is now item #4 in the critical Phase 1 tasks.
