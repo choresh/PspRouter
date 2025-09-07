@@ -104,10 +104,48 @@ public interface IBanditPersistence
 
 public class DatabaseBanditPersistence : IBanditPersistence
 {
-    // TODO: Implement database persistence
-    // - Save bandit statistics to bandit_stats table
-    // - Load statistics on startup
-    // - Rebuild from transaction_outcomes table
+    private readonly IDatabaseContext _db;
+    private readonly ILogger<DatabaseBanditPersistence> _logger;
+
+    public DatabaseBanditPersistence(IDatabaseContext db, ILogger<DatabaseBanditPersistence> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
+
+    public async Task SaveStatisticsAsync(Dictionary<string, Dictionary<string, (double sum, int count)>> stats)
+    {
+        // TODO: Implement using entity classes
+        // foreach (var segment in stats)
+        // {
+        //     foreach (var arm in segment.Value)
+        //     {
+        //         var banditStat = new BanditStat
+        //         {
+        //             SegmentKey = segment.Key,
+        //             ArmName = arm.Key,
+        //             SumRewards = arm.Value.sum,
+        //             CountPulls = arm.Value.count
+        //         };
+        //         await _db.ExecuteAsync(sql, banditStat);
+        //     }
+        // }
+    }
+
+    public async Task<Dictionary<string, Dictionary<string, (double sum, int count)>>> LoadStatisticsAsync()
+    {
+        // TODO: Implement using entity classes
+        // var stats = await _db.QueryAsync<BanditStat>("SELECT * FROM bandit_stats");
+        // return ConvertToDictionary(stats);
+    }
+
+    public async Task RebuildFromTransactionHistoryAsync()
+    {
+        // TODO: Implement using entity classes
+        // var outcomes = await _db.QueryAsync<TransactionOutcome>(
+        //     "SELECT * FROM transaction_outcomes ORDER BY processed_at");
+        // Rebuild bandit statistics from outcomes
+    }
 }
 ```
 
@@ -168,6 +206,79 @@ CREATE TABLE IF NOT EXISTS transaction_outcomes (
 - [ ] Run `setup-database.sql` to create database schema
 - [ ] Verify database connection in `Program.cs`
 - [ ] Test vector operations with sample data
+
+#### **A. Entity Classes (POCOs)**
+**File:** `PspRouter.Lib/Entities.cs` (new file)
+
+**Implementation Required:**
+```csharp
+namespace PspRouter.Lib.Entities;
+
+public class PspLesson
+{
+    public string Key { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public Dictionary<string, string> Meta { get; set; } = new();
+    public float[]? Embedding { get; set; }
+}
+
+public class BanditStat
+{
+    public string SegmentKey { get; set; } = string.Empty;
+    public string ArmName { get; set; } = string.Empty;
+    public double Alpha { get; set; } = 1.0;
+    public double Beta { get; set; } = 1.0;
+    public double SumRewards { get; set; } = 0.0;
+    public int CountPulls { get; set; } = 0;
+    public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+}
+
+public class TransactionOutcome
+{
+    public string DecisionId { get; set; } = string.Empty;
+    public string PspName { get; set; } = string.Empty;
+    public bool Authorized { get; set; }
+    public decimal TransactionAmount { get; set; }
+    public decimal FeeAmount { get; set; }
+    public int ProcessingTimeMs { get; set; }
+    public int RiskScore { get; set; }
+    public DateTime ProcessedAt { get; set; }
+    public string? ErrorCode { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? MerchantId { get; set; }
+    public string? Currency { get; set; }
+    public string? PaymentMethod { get; set; }
+}
+```
+
+#### **B. Database Access Layer**
+**File:** `PspRouter.Lib/DatabaseContext.cs` (new file)
+
+**Implementation Required:**
+```csharp
+public interface IDatabaseContext
+{
+    Task<T?> QuerySingleAsync<T>(string sql, object? parameters = null, CancellationToken ct = default);
+    Task<IEnumerable<T>> QueryAsync<T>(string sql, object? parameters = null, CancellationToken ct = default);
+    Task<int> ExecuteAsync(string sql, object? parameters = null, CancellationToken ct = default);
+    Task<T> ExecuteScalarAsync<T>(string sql, object? parameters = null, CancellationToken ct = default);
+}
+
+public class NpgsqlDatabaseContext : IDatabaseContext
+{
+    private readonly string _connectionString;
+    private readonly ILogger<NpgsqlDatabaseContext> _logger;
+
+    public NpgsqlDatabaseContext(string connectionString, ILogger<NpgsqlDatabaseContext> logger)
+    {
+        _connectionString = connectionString;
+        _logger = logger;
+    }
+
+    // TODO: Implement with proper connection management,
+    // parameterization, error handling, and logging
+}
+```
 
 ### 4. **Vector Memory Integration** ⚠️ **INCOMPLETE**
 **File:** `PspRouter.Lib/Router.cs` (lines 102-128)
@@ -397,36 +508,45 @@ public interface IStatisticsProvider
 
 public class StatisticsProvider : IStatisticsProvider
 {
-    private readonly string _connectionString;
+    private readonly IDatabaseContext _db;
     private readonly ILogger<StatisticsProvider> _logger;
+
+    public StatisticsProvider(IDatabaseContext db, ILogger<StatisticsProvider> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
 
     public async Task<Dictionary<string, double>> GetAuthRates30dAsync(
         IEnumerable<string> psps, 
         CancellationToken ct)
     {
-        // TODO: Implement real statistics calculation
+        // TODO: Implement real statistics calculation using entity classes
         // - Query transaction_outcomes table for last 30 days
         // - Calculate authorization rates per PSP
         // - Return dictionary of PSP -> AuthRate
         
-        // Example implementation:
-        // var stats = new Dictionary<string, double>();
-        // foreach (var psp in psps)
-        // {
-        //     var authRate = await CalculateAuthRateAsync(psp, DateTime.UtcNow.AddDays(-30), ct);
-        //     stats[psp] = authRate;
-        // }
-        // return stats;
-        
-        throw new NotImplementedException("Statistics provider not implemented");
+        var stats = new Dictionary<string, double>();
+        foreach (var psp in psps)
+        {
+            var authRate = await CalculateAuthRateAsync(psp, DateTime.UtcNow.AddDays(-30), ct);
+            stats[psp] = authRate;
+        }
+        return stats;
     }
     
     private async Task<double> CalculateAuthRateAsync(string psp, DateTime since, CancellationToken ct)
     {
-        // TODO: SQL query to calculate auth rate
-        // SELECT COUNT(*) FILTER (WHERE authorized = true) / COUNT(*) as auth_rate
-        // FROM transaction_outcomes 
-        // WHERE psp_name = @psp AND processed_at >= @since
+        // TODO: SQL query to calculate auth rate using entity classes
+        // var outcomes = await _db.QueryAsync<TransactionOutcome>(
+        //     "SELECT * FROM transaction_outcomes WHERE psp_name = @psp AND processed_at >= @since",
+        //     new { psp, since }, ct);
+        // 
+        // var total = outcomes.Count();
+        // var authorized = outcomes.Count(o => o.Authorized);
+        // return total > 0 ? (double)authorized / total : 0.0;
+        
+        throw new NotImplementedException("Statistics provider not implemented");
     }
 }
 ```
