@@ -123,13 +123,13 @@ PspRouter/
 
 ### 🚀 **PspRouter.App** (Console Application)
 - `Program.cs` – **Generic Host** application with dependency injection, configuration, and service registration
-- `PspRouterDemo.cs` – Demo service showcasing the complete PSP routing system with learning
-- `Dummies.cs` – Mock implementations for local testing
+- `Dummies.cs` – Mock implementations for local testing and development
 - `appsettings.json` – Configuration file with logging and PSP router settings
 - `PspRouter.App.csproj` – .NET 8 console app with Generic Host dependencies (`Microsoft.Extensions.Hosting`, `Microsoft.Extensions.Configuration`, etc.)
 
 ### 🧪 **PspRouter.Tests** (Unit Tests)
 - `UnitTest1.cs` – Test cases for core functionality (CapabilityMatrix, Bandit algorithms)
+- `IntegrationTests.cs` – Integration tests demonstrating complete routing flow with learning
 - `PspRouter.Tests.csproj` – .NET 8 test project with xUnit framework
 
 ### 🗄️ **Database & Configuration**
@@ -146,12 +146,13 @@ PspRouter/
 
 ### **🚀 PspRouter.App (Console Application)**
 - **Generic Host Integration**: Enterprise-grade hosting with DI and configuration
-- **Demo & Testing**: Complete working example with mock services
 - **Production Ready**: Structured logging, graceful shutdown, environment support
 - **Flexible Deployment**: Can be deployed as console app, service, or container
+- **Clean Architecture**: Minimal, focused application that hosts the router services
 
 ### **🧪 PspRouter.Tests (Unit Tests)**
 - **Comprehensive Coverage**: Tests for all core business logic
+- **Integration Testing**: Complete routing flow with learning demonstration
 - **Fast Execution**: Isolated tests without external dependencies
 - **CI/CD Ready**: Automated testing in build pipelines
 - **Quality Assurance**: Ensures reliability and correctness
@@ -1097,9 +1098,6 @@ Updates bandit learning with transaction outcome.
 #### `Program.cs`
 Generic Host application with dependency injection and service registration.
 
-#### `PspRouterDemo`
-Demo service showcasing complete PSP routing system with learning.
-
 #### `DummyHealthProvider` & `DummyFeeProvider`
 Mock implementations for local testing and development.
 
@@ -1110,6 +1108,12 @@ Test cases for core functionality including:
 - CapabilityMatrix validation
 - Bandit algorithm testing
 - Contextual bandit feature handling
+
+#### `IntegrationTests`
+Integration tests demonstrating complete routing flow:
+- End-to-end routing with LLM and bandit learning
+- Transaction outcome simulation and learning updates
+- Complete system integration testing
 
 #### `AddAsync(string, string, Dictionary, float[], CancellationToken)`
 Adds lesson to vector memory.
