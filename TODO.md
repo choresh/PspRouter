@@ -29,9 +29,9 @@ This document outlines all the components that need to be implemented or replace
 
 ### **🔄 Sequential vs Parallel Tasks**
 **Sequential (Must be done in order):**
-- Item #1 → Item #2/3 → Item #4 (Core foundation)
-- Item #5/6 → Item #7 (Provider implementations)
-- Item #8 → Item #9/10 (Real data integration)
+- Item #1 → Items #2 & #3 → Item #4 (Core foundation)
+- Items #5 & #6 → Item #7 (Provider implementations)
+- Item #8 → Items #9 & #10 (Real data integration)
 
 **Parallel (Can be done simultaneously):**
 - Items #2 & #3: Environment + Database setup
