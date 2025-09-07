@@ -129,7 +129,7 @@ PspRouter/
 - `PspRouter.API.csproj` – .NET 8 Web API with ASP.NET Core dependencies (`Microsoft.AspNetCore.OpenApi`, `Swashbuckle.AspNetCore`, etc.)
 
 ### 🧪 **PspRouter.Tests** (Unit Tests)
-- `UnitTest1.cs` – Test cases for core functionality (CapabilityMatrix, Bandit algorithms)
+- `UnitTests.cs` – Unit test for core functionality (CapabilityMatrix, Bandit algorithms)
 - `IntegrationTests.cs` – Integration tests demonstrating complete routing flow with learning
 - `PspRouter.Tests.csproj` – .NET 8 test project with xUnit framework
 
