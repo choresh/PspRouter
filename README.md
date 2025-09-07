@@ -360,36 +360,63 @@ export PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Data
 # Build the project
 dotnet build
 
-# Run the application
+# Run the enhanced demo
 dotnet run
 ```
 
 ### Expected Output
 ```
-=== Configuration ===
-✓ Database schema ensured
-✓ Components initialized
+=== Enhanced PSP Router Demo ===
 
---- Transaction 1 ---
-Merchant: M123, Amount: 120.00 USD, Method: Card
-Decision: Adyen
-Reasoning: LLM routing - Auth: 89.00%, Fee: 200bps + $0.30
-Method: LLM routing
-Outcome: ✓ Authorized - Fee: $2.70 - Time: 450ms
-✓ Lesson added to memory
-
-Top memory results:
-score=0.950 key=sample_1 meta_candidate=Adyen
-USD Visa transactions work well with Adyen for low-risk merchants
----
-
-=== PSP Router Ready ===
-The enhanced PSP Router is now running with:
+This demo showcases the complete PSP routing system with:
 • LLM-based intelligent routing
 • Multi-armed bandit learning
 • Vector memory for lessons
 • Comprehensive logging and monitoring
 • Real PostgreSQL database integration
+
+Processing test transactions...
+
+--- Transaction 1 ---
+Merchant: M001, Amount: 150.00 USD, Method: Card
+Decision: Adyen
+Reasoning: Selected Adyen based on high authorization rate and merchant preference for low fees
+Method: llm
+Outcome: ✓ Authorized - Fee: $3.30 - Time: 1200ms
+✓ Lesson added to memory
+
+--- Transaction 2 ---
+Merchant: M002, Amount: 75.50 GBP, Method: Card
+Decision: Stripe
+Reasoning: Selected Stripe for GBP transactions with good authorization rates
+Method: llm
+Outcome: ✗ Declined - Fee: $1.81 - Time: 800ms
+✓ Lesson added to memory
+
+[... continues for 5 transactions ...]
+
+=== Memory Search Demo ===
+Top memory results:
+score=0.892 key=lesson_1_20241201120000 meta_candidate=Adyen
+Transaction M001|USD|Card: Adyen succeeded with 1200ms processing time
+---
+
+=== Learning Summary ===
+The bandit algorithm has been updated with transaction outcomes.
+Future routing decisions will incorporate this learning.
+Memory has been populated with transaction lessons for semantic search.
+
+=== Key Features Demonstrated ===
+✓ LLM-based routing with structured JSON responses
+✓ Multi-armed bandit learning (contextual epsilon-greedy)
+✓ Vector memory for semantic lesson storage
+✓ Comprehensive logging and monitoring
+✓ Realistic transaction outcome simulation
+✓ Graceful fallback to deterministic scoring
+✓ Reward-based learning from transaction outcomes
+
+=== Demo Complete ===
+The Enhanced PSP Router is ready for production deployment!
 ```
 
 ## 📋 Usage Examples
