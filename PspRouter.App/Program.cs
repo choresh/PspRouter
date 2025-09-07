@@ -79,39 +79,13 @@ class Program
             }
         }
 
-        // === Simple Demo Usage ===
-        using (var scope = host.Services.CreateScope())
-        {
-            var router = scope.ServiceProvider.GetRequiredService<PspRouter.Lib.PspRouter>();
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-            
-            Console.WriteLine("=== PSP Router Ready ===");
-            Console.WriteLine("The PSP Router is now running and ready to process routing requests.");
-            Console.WriteLine("Use dependency injection to access the router in your application.");
-            Console.WriteLine();
-            
-            // Example usage
-            var sampleTx = new RouteInput("M001", "US", "IL", "USD", 100.00m, PaymentMethod.Card, CardScheme.Visa, false, 10, "411111");
-            var candidates = new List<PspSnapshot>
-            {
-                new("Adyen", true, "healthy", 0.89, 50, 200m, true, true),
-                new("Stripe", true, "healthy", 0.87, 45, 180m, true, true)
-            };
-            var context = new RouteContext(sampleTx, candidates, new Dictionary<string, string>(), new Dictionary<string, double>());
-            
-            try
-            {
-                var decision = await router.DecideAsync(context, CancellationToken.None);
-                logger.LogInformation("Sample routing decision: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning("Sample routing failed: {Error}", ex.Message);
-            }
-        }
-
-        // === Keep Running ===
+        // === Application Ready ===
+        Console.WriteLine("=== PSP Router Ready ===");
+        Console.WriteLine("The PSP Router is now running and ready to process routing requests.");
+        Console.WriteLine("Use dependency injection to access the router in your application.");
         Console.WriteLine("Press Ctrl+C to exit...");
+        
+        // === Keep Running ===
         await host.RunAsync();
     }
 }

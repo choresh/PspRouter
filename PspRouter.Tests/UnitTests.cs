@@ -2,7 +2,7 @@
 
 namespace PspRouter.Tests;
 
-public class PspRouterTests
+public class UnitTests
 {
     [Fact]
     public void TestCapabilityMatrix()

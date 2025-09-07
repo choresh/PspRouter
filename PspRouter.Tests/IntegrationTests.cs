@@ -1,6 +1,5 @@
 using PspRouter.Lib;
 using Microsoft.Extensions.Logging;
-using Xunit;
 
 namespace PspRouter.Tests;
 
