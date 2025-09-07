@@ -5,6 +5,30 @@ This document outlines all the components that need to be implemented or replace
 
 ---
 
+## 📅 **Implementation Timeline & Next Stages**
+
+### **📋 Implementation Priority Order**
+1. **CRITICAL FIRST**: Bandit Statistics Persistence & Recovery (Item #4) - Production blocker
+2. **Phase 1 Core**: Environment Configuration (Item #1) → Database Setup (Item #2) → Vector Memory Integration (Item #3)
+3. **Phase 2 Integration**: Health Provider (Item #5) → Fee Provider (Item #6) → Service Registration (Item #7)
+4. **Phase 3 Production**: Monitoring (Item #11) → Security (Item #14) → Performance Testing (Item #16)
+5. **Phase 4 Advanced**: ML Enhancements (Item #21) → Analytics (Item #22) → Multi-Region (Item #23)
+
+### **⚠️ Critical Dependencies**
+- **Bandit Persistence** must be implemented FIRST - it's blocking production use
+- **Database Setup** must be complete before bandit persistence
+- **Environment Configuration** must be done before any real integrations
+- **Vector Memory Integration** can be done in parallel with bandit persistence
+
+### **🎯 Success Criteria**
+- **Week 2**: System can restart without losing learning progress
+- **Week 3**: All core functionality working with real data
+- **Week 6**: Real PSP integrations working reliably
+- **Week 8**: Production-ready with monitoring and security
+- **Week 12**: Enterprise-grade system with advanced features
+
+---
+
 ## 🚨 **CRITICAL - Phase 1: Core Functionality**
 
 ### 1. **Environment Configuration** ⚠️ **REQUIRED**
@@ -418,45 +442,23 @@ public class SegmentAnalytics
 
 ---
 
-## 🎯 **Quick Start Implementation Order**
-
-### 10. **Week 1: Core Setup**
-1. ✅ Environment configuration
-2. ✅ Database setup
-3. ✅ Vector memory integration
-4. ✅ **Bandit statistics persistence & recovery** (CRITICAL)
-
-### 11. **Week 2: Real Integrations**
-1. ✅ Health provider implementation
-2. ✅ Fee provider implementation
-3. ✅ Service registration updates
-
-### 12. **Week 3: Data Pipeline**
-1. ✅ Statistics provider
-2. ✅ Merchant preferences
-3. ✅ Basic monitoring
-
-### 13. **Week 4: Production Readiness**
-1. ✅ Caching layer
-2. ✅ Security enhancements
-3. ✅ Performance testing
 
 ---
 
 ## 📝 **Implementation Notes**
 
-### 14. **Priority Levels:**
+### 10. **Priority Levels:**
 - 🚨 **CRITICAL**: Required for basic functionality
 - ⚠️ **HIGH**: Required for production use
 - ❌ **MEDIUM**: Important for scalability
 - 📈 **LOW**: Nice-to-have features
 
-### 15. **Dependencies:**
+### 11. **Dependencies:**
 - Phase 1 must be completed before Phase 2
 - Phase 2 must be completed before Phase 3
 - Phases 4-7 can be implemented in parallel
 
-### 16. **Testing Strategy:**
+### 12. **Testing Strategy:**
 - Unit tests for each new implementation
 - Integration tests with real PSP APIs (test accounts)
 - End-to-end tests for complete routing flow
@@ -466,13 +468,13 @@ public class SegmentAnalytics
 
 ## 🔗 **Useful Resources**
 
-### 17. **PSP API Documentation:**
+### 13. **PSP API Documentation:**
 - [Adyen API](https://docs.adyen.com/api-explorer/)
 - [Stripe API](https://stripe.com/docs/api)
 - [PayPal API](https://developer.paypal.com/docs/api/)
 - [Klarna API](https://developers.klarna.com/api/)
 
-### 18. **Technical References:**
+### 14. **Technical References:**
 - [pgvector Documentation](https://github.com/pgvector/pgvector)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [ASP.NET Core Best Practices](https://docs.microsoft.com/en-us/aspnet/core/)
@@ -485,89 +487,21 @@ public class SegmentAnalytics
 
 ---
 
-## 📅 **Implementation Timeline & Next Stages**
-
-### **🎯 Immediate Priority (Week 1-2)**
-**CRITICAL**: Bandit Statistics Persistence & Recovery (Item #4)
-- **Why First**: This is a production blocker - learning progress is lost on every restart
-- **Impact**: Without this, the system cannot be used in production
-- **Effort**: 3-5 days of development + testing
-- **Dependencies**: Database setup must be complete first
-
-### **🚀 Phase 1 Completion (Week 2-3)**
-After bandit persistence is implemented:
-1. **Vector Memory Integration** (Item #3) - Complete the embedding search
-2. **Environment Configuration** (Item #1) - Production-ready config
-3. **Database Setup** (Item #2) - Production database with proper security
-
-**Target**: End of Week 3 - Core functionality complete and production-ready
-
-### **🔧 Phase 2: Real Data Integration (Week 4-6)**
-**Prerequisites**: Phase 1 must be 100% complete
-- Replace dummy implementations with real PSP integrations
-- Implement real health monitoring and fee providers
-- Add comprehensive error handling and retry logic
-- Performance optimization and caching
-
-**Target**: End of Week 6 - Real PSP integration complete
-
-### **📊 Phase 3: Production Features (Week 7-8)**
-**Prerequisites**: Phase 2 must be complete
-- Monitoring, alerting, and observability
-- Security enhancements and authentication
-- Rate limiting and throttling
-- Advanced configuration management
-
-**Target**: End of Week 8 - Production-ready system
-
-### **🚀 Phase 4-7: Advanced Features (Week 9-12)**
-**Can be implemented in parallel** after Phase 3:
-- Advanced ML features and analytics
-- Multi-region support and failover
-- Containerization and CI/CD
-- Advanced testing and quality assurance
-
-**Target**: End of Week 12 - Full enterprise-grade system
-
-### **📋 Implementation Order Summary**
-```
-Week 1-2:  Bandit Persistence (CRITICAL)
-Week 2-3:  Complete Phase 1 (Vector Memory, Config, DB)
-Week 4-6:  Phase 2 (Real PSP Integration)
-Week 7-8:  Phase 3 (Production Features)
-Week 9-12: Phase 4-7 (Advanced Features)
-```
-
-### **⚠️ Critical Dependencies**
-- **Bandit Persistence** must be implemented FIRST - it's blocking production use
-- **Database Setup** must be complete before bandit persistence
-- **Environment Configuration** must be done before any real integrations
-- **Vector Memory Integration** can be done in parallel with bandit persistence
-
-### **🎯 Success Criteria**
-- **Week 2**: System can restart without losing learning progress
-- **Week 3**: All core functionality working with real data
-- **Week 6**: Real PSP integrations working reliably
-- **Week 8**: Production-ready with monitoring and security
-- **Week 12**: Enterprise-grade system with advanced features
-
----
-
 ## 🛠 **Implementation Tasks & Guidance**
 
-### 19. **🔄 Replace Dummy Implementations**
+### 15. **🔄 Replace Dummy Implementations**
 - [ ] Implement `IHealthProvider` and `IFeeQuoteProvider` with your metrics/config
 - [ ] Swap in your own stats for `AuthRate30d` and pass them in `RouteContext`
 - [ ] Replace `DummyHealthProvider` and `DummyFeeProvider` with real implementations
 - [ ] Update service registration in `Program.cs`
 
-### 20. **🔧 System Tuning & Configuration**
+### 16. **🔧 System Tuning & Configuration**
 - [ ] Adjust embedding model & `vector(N)` dimension in `MemoryPgVector.cs` to match your chosen model
 - [ ] Configure model name in `OpenAIChatClient` (default: `gpt-4.1`)
 - [ ] Tune bandit epsilon values for optimal exploration/exploitation balance
 - [ ] Configure logging levels for production vs development environments
 
-### 21. **📊 Monitoring & Observability Setup**
+### 17. **📊 Monitoring & Observability Setup**
 
 #### **Logging Configuration**
 - [ ] **Information**: Routing decisions, learning updates
@@ -587,7 +521,7 @@ Week 9-12: Phase 4-7 (Advanced Features)
 - [ ] Implement health check endpoints for all PSPs
 - [ ] Set up performance dashboards
 
-### 22. **📦 Packaging & Distribution**
+### 18. **📦 Packaging & Distribution**
 
 #### **Creating NuGet Package**
 - [ ] Build the library in Release mode
@@ -617,7 +551,7 @@ The library has minimal external dependencies:
 - `Pgvector` - Vector database support
 - `Microsoft.Extensions.Logging.Abstractions` - Logging interfaces
 
-### 23. **🔧 Customization & Extensions**
+### 19. **🔧 Customization & Extensions**
 
 #### **External Bandit Libraries**
 For production use, consider integrating with industry-standard libraries:
@@ -636,7 +570,7 @@ For production use, consider integrating with industry-standard libraries:
 - [ ] Test reward function with historical data
 - [ ] Validate reward function performance
 
-### 24. **📈 Performance Optimization**
+### 20. **📈 Performance Optimization**
 
 #### **Caching Strategy**
 - [ ] **PSP Health**: Cache health status for 30 seconds
@@ -660,7 +594,7 @@ For production use, consider integrating with industry-standard libraries:
   "Host=localhost;Username=postgres;Password=postgres;Database=psp_router;Pooling=true;MinPoolSize=5;MaxPoolSize=20"
   ```
 
-### 25. **🚨 Troubleshooting Guide**
+### 21. **🚨 Troubleshooting Guide**
 
 #### **Common Issues & Solutions**
 
@@ -692,7 +626,7 @@ Error: permission denied for table psp_lessons
 - [ ] Enable debug logging: `export DOTNET_ENVIRONMENT=Development`
 - [ ] Run with verbose logging: `dotnet run --verbosity detailed`
 
-### 26. **🔒 Security Implementation**
+### 22. **🔒 Security Implementation**
 
 #### **API Key Security**
 - [ ] Never commit API keys to version control
@@ -710,7 +644,7 @@ Error: permission denied for table psp_lessons
 - [ ] Implement rate limiting
 - [ ] Monitor for suspicious activity
 
-### 27. **💾 Backup and Recovery Setup**
+### 23. **💾 Backup and Recovery Setup**
 
 #### **Database Backup**
 - [ ] Create backup script: `pg_dump -U postgres -h localhost psp_router > psp_router_backup.sql`
@@ -724,15 +658,3 @@ Error: permission denied for table psp_lessons
 
 ---
 
-## 🚨 **CRITICAL ISSUE IDENTIFIED**
-
-### 28. **Bandit Statistics Persistence Problem**
-The system currently has a **critical flaw**: bandit learning statistics are lost on every server restart because they exist only in memory. This means:
-
-- ❌ **No learning persistence**: All bandit progress is lost on restart
-- ❌ **No transaction outcome storage**: Outcomes are only logged, not stored
-- ❌ **No recovery mechanism**: System starts with empty statistics every time
-- ❌ **Production blocker**: This makes the system unsuitable for production use
-
-### 29. **Immediate Action Required**
-**Priority 1**: Implement bandit statistics persistence and recovery before any other features. This is now item #4 in the critical Phase 1 tasks.
