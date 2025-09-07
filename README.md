@@ -35,6 +35,8 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - **Embedding Storage**: OpenAI embeddings for contextual memory
 - **Lesson Learning**: Automatic capture and retrieval of routing insights
 - **Historical Context**: Leverages past decisions for better routing
+- **LLM Integration**: Used exclusively for LLM-based routing decisions (not fallback)
+- **System Memory**: Acts as the "memory" of the system, helping the LLM make more informed decisions based on past experience, similar to how a human expert would recall similar past situations when making routing decisions
 
 ### 🏗️ **Generic Host Architecture**
 - **Enterprise-Grade Hosting**: Built on .NET Generic Host for production deployment
@@ -443,7 +445,77 @@ This makes the system capable of handling real-world payment routing scenarios t
 └─────────────────┘    └──────────────────┘
 ```
 
-### 🧠 Vector Memory Flow
+## 🧠 **Vector Database: The System's Memory**
+
+### **Role and Purpose**
+The vector database serves as the **"memory" of the PSP Router system**, providing the LLM with historical context and lessons learned from past routing decisions. It acts like a human expert's experience - when making a routing decision, the system can recall similar past situations and their outcomes to make more informed choices.
+
+### **How It Works**
+
+#### **1. Learning Phase (After Each Transaction)**
+```
+Transaction Outcome → Generate Embedding → Store in Vector DB
+```
+- **Captures Lessons**: After each transaction completes, the system captures the outcome
+- **Creates Embeddings**: Uses OpenAI embeddings to convert the transaction context and outcome into a vector representation
+- **Stores Knowledge**: Saves the embedding along with metadata (PSP used, success/failure, fees, etc.) in PostgreSQL with pgvector
+
+#### **2. Decision Phase (During Routing)**
+```
+New Transaction → Generate Query Embedding → Search Similar Contexts → Retrieve Lessons → Provide to LLM
+```
+- **Query Generation**: Creates an embedding for the current transaction context
+- **Semantic Search**: Finds similar past transactions using cosine similarity
+- **Lesson Retrieval**: Returns the most relevant historical lessons
+- **LLM Enhancement**: Provides these lessons as context to the LLM for better decision-making
+
+### **Key Benefits**
+
+#### **🧠 Human-Like Decision Making**
+- **Pattern Recognition**: Identifies patterns in successful/failed transactions
+- **Contextual Learning**: Learns from similar situations (same merchant, country, payment method, etc.)
+- **Experience Accumulation**: Builds institutional knowledge over time
+
+#### **📈 Continuous Improvement**
+- **Adaptive Learning**: System gets smarter with each transaction
+- **Historical Insights**: Leverages months/years of routing experience
+- **Contextual Awareness**: Considers nuanced factors that simple rules might miss
+
+#### **🎯 Enhanced Accuracy**
+- **Better Decisions**: LLM makes more informed choices with historical context
+- **Reduced Errors**: Avoids repeating past mistakes
+- **Optimized Routing**: Learns which PSPs work best in specific scenarios
+
+### **Technical Implementation**
+
+#### **Database Schema**
+```sql
+CREATE TABLE psp_lessons (
+    key TEXT PRIMARY KEY,
+    content TEXT NOT NULL,           -- Transaction context and outcome
+    meta JSONB NOT NULL,             -- Metadata (PSP, fees, success, etc.)
+    embedding vector(3072)           -- OpenAI embedding vector
+);
+```
+
+#### **Search Process**
+```csharp
+// 1. Generate query embedding
+var query = $"PSP routing for {currency} {method} {scheme} merchant {country}";
+var queryEmbedding = await embeddings.CreateEmbeddingAsync(query, ct);
+
+// 2. Search for similar contexts
+var results = await memory.SearchAsync(queryEmbedding, k: 5, ct);
+
+// 3. Provide lessons to LLM
+var contextJson = JsonSerializer.Serialize(new {
+    Transaction = currentTx,
+    Candidates = validCandidates,
+    RelevantLessons = results.Select(r => r.text).ToList()  // Historical insights
+});
+```
+
+### **Vector Memory Flow**
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Transaction   │───▶│   Generate       │───▶│   Store in      │
@@ -463,6 +535,11 @@ This makes the system capable of handling real-world payment routing scenarios t
 │   Insights      │    │   Knowledge      │
 └─────────────────┘    └──────────────────┘
 ```
+
+### **Important Distinction**
+- **Vector DB is FOR the LLM**: Used exclusively to enhance LLM decision-making
+- **NOT a Fallback**: The deterministic fallback system does not use vector memory
+- **Memory vs. Logic**: Vector DB provides historical context, not routing logic
 
 ### 🔄 System Integration Flow
 ```
