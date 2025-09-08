@@ -1,21 +1,18 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 
 namespace PspRouter.Trainer;
 
-// Training manager for orchestrating the fine-tuning process
+// Training manager for running the fine-tuning process
 public class TrainingManager : BackgroundService
 {
     private readonly ITrainingService _trainingService;
     private readonly ILogger<TrainingManager> _logger;
-    private readonly IConfiguration _configuration;
 
-    public TrainingManager(ITrainingService trainingService, ILogger<TrainingManager> logger, IConfiguration configuration)
+    public TrainingManager(ITrainingService trainingService, ILogger<TrainingManager> logger)
     {
         _trainingService = trainingService;
         _logger = logger;
-        _configuration = configuration;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -26,8 +23,8 @@ public class TrainingManager : BackgroundService
         {
             _logger.LogInformation("Starting complete fine-tuning process...");
             
-            // Use the complete fine-tuning workflow
-            var modelId = await _trainingService.CreateFineTunedModelAsync(stoppingToken);
+            // Run the complete fine-tuning workflow
+            var modelId = await _trainingService.CreateFineTunedModel(stoppingToken);
             
             _logger.LogInformation("🎉 Fine-tuning completed successfully! Model ID: {ModelId}", modelId);
             

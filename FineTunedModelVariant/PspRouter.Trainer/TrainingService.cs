@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using OpenAI;
 using PspRouter.Lib;
 using System.Text;
@@ -12,15 +11,13 @@ public class TrainingService : ITrainingService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<TrainingService> _logger;
-    private readonly IConfiguration _configuration;
     private readonly ITrainingDataProvider _trainingDataProvider;
     private readonly string _apiKey;
 
-    public TrainingService(OpenAIClient openAiClient, ILogger<TrainingService> logger, IConfiguration configuration, ITrainingDataProvider trainingDataProvider)
+    public TrainingService(OpenAIClient openAiClient, ILogger<TrainingService> logger, ITrainingDataProvider trainingDataProvider)
     {
         _httpClient = new HttpClient();
         _logger = logger;
-        _configuration = configuration;
         _trainingDataProvider = trainingDataProvider;
         
         // Get API key from environment
@@ -30,17 +27,17 @@ public class TrainingService : ITrainingService
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
     }
 
-    public async Task<string> CreateFineTunedModelAsync(CancellationToken cancellationToken = default)
+    public async Task<string> CreateFineTunedModel(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating fine-tuned model...");
         
         try
         {
-        // 1. Upload training data
+            // 1. Upload training data
             _logger.LogInformation("Step 1: Uploading training data...");
             var fileId = await UploadTrainingDataAsync(cancellationToken);
             
-        // 2. Create fine-tuning job
+            // 2. Create fine-tuning job
             _logger.LogInformation("Step 2: Creating fine-tuning job...");
             var jobId = await CreateFineTuningJobAsync(fileId, cancellationToken);
             

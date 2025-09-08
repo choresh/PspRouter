@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Data.SqlClient;
 using PspRouter.Lib;
 
@@ -8,13 +7,11 @@ namespace PspRouter.Trainer;
 public class TrainingDataProvider : ITrainingDataProvider
 {
     private readonly ILogger<TrainingDataProvider> _logger;
-    private readonly IConfiguration _configuration;
     private readonly string _connectionString;
 
-    public TrainingDataProvider(ILogger<TrainingDataProvider> logger, IConfiguration configuration)
+    public TrainingDataProvider(ILogger<TrainingDataProvider> logger)
     {
         _logger = logger;
-        _configuration = configuration;
 
         // Get .env file variables
         var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION");
