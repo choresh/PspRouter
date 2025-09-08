@@ -16,7 +16,6 @@ public class TrainingService : ITrainingService
 
     public TrainingService(OpenAIClient openAiClient, ILogger<TrainingService> logger, ITrainingDataProvider trainingDataProvider)
     {
-        _httpClient = new HttpClient();
         _logger = logger;
         _trainingDataProvider = trainingDataProvider;
         
@@ -24,7 +23,8 @@ public class TrainingService : ITrainingService
         _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? 
                   throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
         
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
+        _httpClient = new HttpClient();
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
     }
 
     public async Task<string> CreateFineTunedModel(CancellationToken cancellationToken = default)

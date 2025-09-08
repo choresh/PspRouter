@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using PspRouter.Lib;
-using System.Text.Json;
 using System.Reflection;
 
 namespace PspRouter.API.Controllers;
