@@ -41,8 +41,8 @@ public sealed class OpenAIChatClient : IChatClient
             var payload = new
             {
                 model = _model,
-                temperature = temperature,
-                messages = messages,
+                temperature,
+                messages,
                 response_format = new { type = "json_object" },
                 tools = toolDefs.Count == 0 ? null : toolDefs,
                 tool_choice = toolDefs.Count == 0 ? null : "auto"
