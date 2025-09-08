@@ -24,18 +24,10 @@ public class TrainingManager : BackgroundService
         
         try
         {
-            
-            var trainingDataPath = _configuration["Training:DataPath"];
-            if (string.IsNullOrEmpty(trainingDataPath))
-            {
-                _logger.LogWarning("Training data path not specified. Set Training:DataPath in configuration.");
-                return;
-            }
-
             _logger.LogInformation("Starting fine-tuning process...");
             
-            // Step 1: Upload training data
-            var fileId = await _trainingService.UploadTrainingDataAsync(trainingDataPath, stoppingToken);
+            // Step 1: Upload training data from database
+            var fileId = await _trainingService.UploadTrainingDataAsync(string.Empty, stoppingToken);
             _logger.LogInformation("Training data uploaded with ID: {FileId}", fileId);
             
             // Step 2: Create fine-tuning job

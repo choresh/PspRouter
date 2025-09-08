@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using OpenAI;
+using PspRouter.Lib;
 
 namespace PspRouter.Trainer;
 
@@ -10,12 +11,14 @@ public class TrainingService : ITrainingService
     private readonly OpenAIClient _openAiClient;
     private readonly ILogger<TrainingService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly ITrainingDataProvider _trainingDataProvider;
 
-    public TrainingService(OpenAIClient openAiClient, ILogger<TrainingService> logger, IConfiguration configuration)
+    public TrainingService(OpenAIClient openAiClient, ILogger<TrainingService> logger, IConfiguration configuration, ITrainingDataProvider trainingDataProvider)
     {
         _openAiClient = openAiClient;
         _logger = logger;
         _configuration = configuration;
+        _trainingDataProvider = trainingDataProvider;
     }
 
     public async Task<string> CreateFineTunedModelAsync(CancellationToken cancellationToken = default)
@@ -34,13 +37,40 @@ public class TrainingService : ITrainingService
 
     public async Task<string> UploadTrainingDataAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Uploading training data from {FilePath}", filePath);
+        _logger.LogInformation("Uploading training data from database");
         
-        // TODO: Implement file upload logic
-        // Use OpenAI Files API to upload training data
-        
-        await Task.Delay(1000, cancellationToken); // Placeholder
-        return "file-placeholder-id";
+        try
+        {
+            // Get training data from the database
+            var trainingData = await _trainingDataProvider.GetTrainingDataAsync(cancellationToken);
+            
+            _logger.LogInformation("Retrieved {Count} training data records from database", trainingData.Count());
+            
+            // Convert training data to JSONL format for OpenAI
+            var jsonlContent = ConvertTrainingDataToJsonl(trainingData);
+            
+            // TODO: Implement actual OpenAI Files API upload
+            // For now, we'll create a temporary file and upload it
+            var tempFilePath = Path.GetTempFileName();
+            await File.WriteAllTextAsync(tempFilePath, jsonlContent, cancellationToken);
+            
+            _logger.LogInformation("Created temporary training file: {TempFilePath}", tempFilePath);
+            
+            // TODO: Upload to OpenAI Files API
+            // var fileResponse = await _openAiClient.Files.UploadFileAsync(
+            //     new FileUploadRequest(tempFilePath, "fine-tune", OpenAIFilePurpose.FineTune));
+            
+            // Clean up temp file
+            File.Delete(tempFilePath);
+            
+            await Task.Delay(1000, cancellationToken); // Placeholder
+            return "file-placeholder-id";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading training data");
+            throw;
+        }
     }
 
     public async Task<string> CreateFineTuningJobAsync(string fileId, CancellationToken cancellationToken = default)
@@ -63,5 +93,28 @@ public class TrainingService : ITrainingService
         
         await Task.Delay(1000, cancellationToken); // Placeholder
         return "completed";
+    }
+
+    private string ConvertTrainingDataToJsonl(IEnumerable<TrainingData> trainingData)
+    {
+        var jsonlLines = new List<string>();
+        
+        foreach (var data in trainingData)
+        {
+            var trainingExample = new
+            {
+                messages = new[]
+                {
+                    new { role = "system", content = data.SystemPrompt },
+                    new { role = "user", content = data.UserInstruction },
+                    new { role = "assistant", content = data.ExpectedResponse }
+                }
+            };
+            
+            var jsonLine = System.Text.Json.JsonSerializer.Serialize(trainingExample);
+            jsonlLines.Add(jsonLine);
+        }
+        
+        return string.Join("\n", jsonlLines);
     }
 }

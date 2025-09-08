@@ -59,3 +59,14 @@ public record TransactionOutcome(
     string? ErrorCode = null,
     string? ErrorMessage = null
 );
+
+public record TrainingData(
+    int Id,
+    string SystemPrompt,
+    string UserInstruction,
+    string ContextJson,
+    string ExpectedResponse,
+    DateTime CreatedAt,
+    string? Source = null,
+    bool IsValidated = false
+);

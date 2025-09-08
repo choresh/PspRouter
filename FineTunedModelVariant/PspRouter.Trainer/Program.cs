@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using OpenAI;
+using PspRouter.Lib;
 
 namespace PspRouter.Trainer;
 
@@ -48,6 +49,7 @@ public class Program
                 
                 // Register training services
                 services.AddSingleton<ITrainingService, TrainingService>();
+                services.AddSingleton<ITrainingDataProvider, TrainingDataProvider>();
                 
                 // Register hosted service for training
                 services.AddHostedService<TrainingManager>();
