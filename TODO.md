@@ -44,6 +44,16 @@ This document outlines all the components that need to be implemented or replace
 - [ ] Create `.env` file or configure in your deployment environment
 - [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
 
+#### LLM Setup (Pre-trained model)
+- [ ] Set model name in DI (`OpenAIChatClient`, e.g., gpt-4.1)
+- [ ] Confirm strict `RouteDecision` JSON schema in `BuildSystemPrompt()`
+- [ ] Add optional few-shot examples for reasoning quality
+- [ ] Configure LLM timeout and fallback threshold (e.g., 800–1200 ms)
+- [ ] Enforce strict JSON validation before accepting model output
+- [ ] Ensure tool registration for health/fees is active
+- [ ] Observability: log latency, token usage, fallback rate, parse errors
+- [ ] Tests: unit (schema/fallback), integration (end-to-end), performance (P95 latency)
+
 ---
 
 ## 🔧 **Phase 2: Replace Dummy Implementations**
