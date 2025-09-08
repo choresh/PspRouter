@@ -1,8 +1,45 @@
 using PspRouter.Lib;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using System.Reflection;
+using DotNetEnv;
+
+// Load .env file first, before other configuration sources
+try
+{
+    // Try multiple locations for .env file
+    var envPaths = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".env"),
+        Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", ".env")
+    };
+
+    bool envLoaded = false;
+    foreach (var envPath in envPaths)
+    {
+        if (File.Exists(envPath))
+        {
+            Env.Load(envPath);
+            Console.WriteLine($"✅ .env file loaded successfully from: {envPath}");
+            envLoaded = true;
+            break;
+        }
+    }
+
+    if (!envLoaded)
+    {
+        Console.WriteLine("⚠️ .env file not found in any of these locations:");
+        foreach (var path in envPaths)
+        {
+            Console.WriteLine($"   - {path}");
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"❌ Error loading .env file: {ex.Message}");
+}
 
 var builder = WebApplication.CreateBuilder(args);
 

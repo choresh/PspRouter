@@ -5,7 +5,7 @@ namespace PspRouter.Tests;
 
 public class IntegrationTests
 {
-    private readonly ICapabilityProvider capability = new PspRouter.API.DummyCapabilityProvider();
+    private readonly ICapabilityProvider capability = new API.DummyCapabilityProvider();
 
     [Fact]
     public async Task TestCompleteRoutingFlow()
@@ -13,10 +13,10 @@ public class IntegrationTests
         // This test demonstrates the complete PSP routing system
         
         // Arrange - Create mock services
-        var healthProvider = new PspRouter.API.DummyHealthProvider();
-        var feeProvider = new PspRouter.API.DummyFeeProvider();
-        var chatClient = new PspRouter.API.DummyChatClient();
-        var logger = new MockLogger<PspRouter.Lib.PspRouter>();
+        var healthProvider = new API.DummyHealthProvider();
+        var feeProvider = new API.DummyFeeProvider();
+        var chatClient = new API.DummyChatClient();
+        var logger = new MockLogger<Lib.PspRouter>();
         
         var tools = new List<IAgentTool>
         {
@@ -24,7 +24,7 @@ public class IntegrationTests
             new GetFeeQuoteTool(feeProvider, () => new RouteInput("", "", "", "", 0, PaymentMethod.Card))
         };
 
-        var router = new PspRouter.Lib.PspRouter(chatClient, healthProvider, feeProvider, tools, logger);
+        var router = new Lib.PspRouter(chatClient, healthProvider, feeProvider, tools, logger);
 
         // Test multiple transactions to demonstrate learning
         var testTransactions = new[]

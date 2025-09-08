@@ -4,7 +4,7 @@ namespace PspRouter.Tests;
 
 public class UnitTests
 {
-    private readonly ICapabilityProvider capability = new PspRouter.API.DummyCapabilityProvider();
+    private readonly ICapabilityProvider capability = new API.DummyCapabilityProvider();
 
     [Fact]
     public void TestCapabilityProvider()

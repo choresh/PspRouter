@@ -2,6 +2,44 @@ using PspRouter.Lib;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using System.Reflection;
+using DotNetEnv;
+
+// Load .env file first, before other configuration sources
+try
+{
+    // Try multiple locations for .env file
+    var envPaths = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".env"),
+        Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", ".env")
+    };
+
+    bool envLoaded = false;
+    foreach (var envPath in envPaths)
+    {
+        if (File.Exists(envPath))
+        {
+            Env.Load(envPath);
+            Console.WriteLine($"✅ .env file loaded successfully from: {envPath}");
+            envLoaded = true;
+            break;
+        }
+    }
+
+    if (!envLoaded)
+    {
+        Console.WriteLine("⚠️ .env file not found in any of these locations:");
+        foreach (var path in envPaths)
+        {
+            Console.WriteLine($"   - {path}");
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"❌ Error loading .env file: {ex.Message}");
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,7 +70,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     var assembly = Assembly.GetExecutingAssembly();
     var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
-    var informationalVersion = assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
+    var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
     
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
@@ -54,7 +92,7 @@ builder.Services.AddSingleton<IChatClient>(provider =>
     new OpenAIChatClient(apiKey, model: ftModel));
 
 // === Register Router as Scoped (for request-based operations) ===
-builder.Services.AddScoped<PspRouter.Lib.PspRouter>(provider =>
+builder.Services.AddScoped(provider =>
 {
     var chat = provider.GetRequiredService<IChatClient>();
     var health = provider.GetRequiredService<IHealthProvider>();

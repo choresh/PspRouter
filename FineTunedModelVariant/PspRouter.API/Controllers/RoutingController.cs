@@ -9,10 +9,10 @@ namespace PspRouter.API.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class RoutingController : ControllerBase
 {
-    private readonly PspRouter.Lib.PspRouter _router;
+    private readonly Lib.PspRouter _router;
     private readonly ILogger<RoutingController> _logger;
 
-    public RoutingController(PspRouter.Lib.PspRouter router, ILogger<RoutingController> logger)
+    public RoutingController(Lib.PspRouter router, ILogger<RoutingController> logger)
     {
         _router = router;
         _logger = logger;
@@ -31,7 +31,7 @@ public class RoutingController : ControllerBase
             _logger.LogInformation("Processing routing request for merchant {MerchantId}, amount {Amount} {Currency}", 
                 request.Transaction.MerchantId, request.Transaction.Amount, request.Transaction.Currency);
 
-            var context = new PspRouter.Lib.RouteContext(
+            var context = new Lib.RouteContext(
                 request.Transaction,
                 request.Candidates,
                 request.Preferences ?? new Dictionary<string, string>(),
@@ -62,7 +62,7 @@ public class RoutingController : ControllerBase
     {
         var assembly = Assembly.GetExecutingAssembly();
         var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
-        var informationalVersion = assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
+        var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
         
         return Ok(new
         {
