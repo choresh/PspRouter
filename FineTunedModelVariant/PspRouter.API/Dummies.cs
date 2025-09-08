@@ -27,3 +27,14 @@ public class DummyChatClient : IChatClient
         return Task.FromResult("{\"Schema_Version\":\"1.0\",\"Decision_Id\":\"dummy\",\"Candidate\":\"Adyen\",\"Alternates\":[],\"Reasoning\":\"Dummy decision\",\"Guardrail\":\"none\",\"Constraints\":{\"Must_Use_3ds\":false,\"Retry_Window_Ms\":8000,\"Max_Retries\":1},\"Features_Used\":[]}");
     }
 }
+
+public sealed class DummyCapabilityProvider : ICapabilityProvider
+{
+    public bool Supports(string psp, RouteInput tx) => tx.Method switch
+    {
+        PaymentMethod.Card           => psp is "Adyen" or "Stripe",
+        PaymentMethod.PayPal         => psp is "PayPal",
+        PaymentMethod.KlarnaPayLater => psp is "Klarna",
+        _ => false
+    };
+}

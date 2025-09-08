@@ -52,35 +52,7 @@ public class RoutingController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Update the router with transaction outcome for learning
-    /// </summary>
-    /// <param name="outcome">Transaction outcome details</param>
-    /// <returns>Success confirmation</returns>
-    [HttpPost("outcome")]
-    public async Task<ActionResult> UpdateOutcome([FromBody] TransactionOutcome outcome)
-    {
-        try
-        {
-            _logger.LogInformation("Updating outcome for decision {DecisionId}, PSP {PSP}, Authorized: {Authorized}", 
-                outcome.DecisionId, outcome.PspName, outcome.Authorized);
-
-            // Note: We need the original decision to update the reward
-            // In a real implementation, you might store decisions and retrieve them here
-            // For now, we'll log the outcome for learning purposes
-            _logger.LogInformation("Transaction outcome: {Outcome}", JsonSerializer.Serialize(outcome));
-
-            // Simulate async operation
-            await Task.Delay(1);
-
-            return Ok(new { message = "Outcome recorded successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating transaction outcome");
-            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
-        }
-    }
+    
 
     /// <summary>
     /// Get health status of the routing service

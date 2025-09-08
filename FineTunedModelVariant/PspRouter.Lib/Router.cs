@@ -11,16 +11,14 @@ public sealed class PspRouter
     private readonly IEnumerable<IAgentTool> _tools;
     private readonly IHealthProvider _health;
     private readonly IFeeQuoteProvider _fees;
-    private readonly IBandit? _bandit;
-    private readonly IVectorMemory? _memory;
+    
     private readonly ILogger<PspRouter>? _logger;
 
     public PspRouter(IChatClient chat, IHealthProvider health, IFeeQuoteProvider fees,
-                     IEnumerable<IAgentTool>? tools = null, IBandit? bandit = null, 
-                     IVectorMemory? memory = null, ILogger<PspRouter>? logger = null)
+                     IEnumerable<IAgentTool>? tools = null, ILogger<PspRouter>? logger = null)
     {
         _chat = chat; _health = health; _fees = fees; _tools = tools ?? Array.Empty<IAgentTool>();
-        _bandit = bandit; _memory = memory; _logger = logger;
+        _logger = logger;
     }
 
     public async Task<RouteDecision> DecideAsync(RouteContext ctx, CancellationToken ct)
@@ -101,8 +99,6 @@ public sealed class PspRouter
 
     private async Task<List<string>> GetRelevantLessonsAsync(RouteContext ctx, CancellationToken ct)
     {
-        if (_memory == null) return new List<string>();
-
         try
         {
             // Create a query based on transaction context
@@ -167,21 +163,6 @@ public sealed class PspRouter
 
     private RouteDecision ScoreDeterministically(RouteInput tx, List<PspSnapshot> candidates)
     {
-        // Use bandit learning if available
-        if (_bandit != null)
-        {
-            var segmentKey = $"{tx.MerchantCountry}_{tx.Currency}_{tx.Scheme}";
-            var candidateNames = candidates.Select(c => c.Name).ToList();
-            var banditChoice = _bandit.Select(segmentKey, candidateNames);
-            
-            var chosenCandidate = candidates.FirstOrDefault(c => c.Name == banditChoice);
-            if (chosenCandidate != null)
-            {
-                _logger?.LogInformation("Bandit selected {Candidate} for segment {Segment}", banditChoice, segmentKey);
-                return CreateDecision(chosenCandidate, candidates, tx, "Bandit learning", segmentKey);
-            }
-        }
-
         // Fallback to deterministic scoring
         var best = candidates.OrderByDescending(c =>
             c.AuthRate30d - (c.FeeBps/10000.0) - (double)(c.FixedFee/Math.Max(tx.Amount,1m))
@@ -212,53 +193,5 @@ public sealed class PspRouter
         );
     }
 
-    /// <summary>
-    /// Updates the bandit learning system with transaction outcome feedback
-    /// </summary>
-    public void UpdateReward(RouteDecision decision, TransactionOutcome outcome)
-    {
-        if (_bandit == null || _logger == null) return;
-
-        try
-        {
-            var segmentKey = ExtractSegmentKey(decision);
-            var reward = CalculateReward(outcome);
-            
-            _bandit.Update(segmentKey, decision.Candidate, reward);
-            _logger.LogInformation("Updated bandit reward: segment={Segment}, psp={PSP}, reward={Reward}", 
-                segmentKey, decision.Candidate, reward);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to update bandit reward for decision {DecisionId}", decision.Decision_Id);
-        }
-    }
-
-    private static string ExtractSegmentKey(RouteDecision decision)
-    {
-        // Extract segment from features used
-        var segmentFeature = decision.Features_Used.FirstOrDefault(f => f.StartsWith("segment="));
-        if (segmentFeature != null)
-        {
-            return segmentFeature.Split('=')[1];
-        }
-        return "unknown";
-    }
-
-    private static double CalculateReward(TransactionOutcome outcome)
-    {
-        // Base reward for successful authorization
-        var reward = outcome.Authorized ? 1.0 : 0.0;
-        
-        // Penalty for fees (normalized)
-        reward -= (double)(outcome.FeeAmount / Math.Max(outcome.TransactionAmount, 1m));
-        
-        // Bonus for fast processing
-        if (outcome.ProcessingTimeMs < 1000) reward += 0.1;
-        
-        // Penalty for high risk
-        if (outcome.RiskScore > 50) reward -= 0.2;
-        
-        return Math.Max(-1.0, Math.Min(1.0, reward)); // Clamp between -1 and 1
-    }
+    
 }

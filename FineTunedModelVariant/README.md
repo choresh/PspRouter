@@ -1,16 +1,16 @@
-# 🚀 PSP Router - Intelligent Payment Routing System
+# 🚀 PSP Router - Intelligent Payment Routing System (Fine-Tuned Model variant)
 
 ## 🎯 Purpose
-Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using **LLM-based decision making**, **multi-armed bandit learning**, and **vector memory**.
+Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using a **fine-tuned LLM-based decision engine** with deterministic fallback.
 
 ## 🏗 Solution Overview
 - **3-Project Architecture**: Clean separation with Library, Web API, and Tests
 - **ASP.NET Core Web API**: RESTful API with Swagger documentation
 - **Configuration Management**: JSON + environment variables with hierarchical config
 - **Deterministic Guardrails**: Capabilities, SCA/3DS, health checks
-- **LLM Decision Engine**: GPT-4 with tool calling and structured responses
-- **Contextual Bandit Learning**: Enhanced epsilon-greedy with transaction context
-- **Vector Memory System**: pgvector-powered semantic search for lessons learned
+- **LLM Decision Engine**: Fine-tuned GPT-4 with tool calling and structured responses
+ 
+// Vector Memory System removed in this variant
 - **Graceful Fallback**: Deterministic scoring when LLM is unavailable
 - **Production Ready**: Structured logging, health checks, and monitoring
 
@@ -22,21 +22,7 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - **Tool Integration**: Can call external APIs for real-time health and fee data
 - **Fallback Safety**: Graceful degradation to deterministic scoring when LLM is unavailable
 
-### 🎰 **Multi-Armed Bandit Learning**
-- **Contextual Bandits**: Enhanced epsilon-greedy with transaction context awareness
-- **Epsilon-Greedy Algorithm**: Balances exploration vs exploitation (configurable epsilon)
-- **Thompson Sampling**: Bayesian approach for optimal arm selection
-- **Contextual Features**: Uses transaction amount, risk score, and other features for better decisions
-- **Real-Time Updates**: Continuous learning from transaction outcomes
-- **Production Ready**: Thread-safe, efficient, and well-tested implementations
-
-### 🧠 **Vector Memory System**
-- **Semantic Search**: pgvector-powered similarity search for routing lessons
-- **Embedding Storage**: OpenAI embeddings for contextual memory
-- **Lesson Learning**: Automatic capture and retrieval of routing insights
-- **Historical Context**: Leverages past decisions for better routing
-- **LLM Integration**: Used exclusively for LLM-based routing decisions (not fallback)
-- **System Memory**: Acts as the "memory" of the system, helping the LLM make more informed decisions based on past experience, similar to how a human expert would recall similar past situations when making routing decisions
+// Bandit learning and vector memory are not used in this architecture
 
 ### 🏗️ **ASP.NET Core Web API Architecture**
 - **Enterprise-Grade Web API**: Built on ASP.NET Core for production deployment
@@ -65,9 +51,7 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 │  │  │  Provider   │ │  Provider   │ │   Client    │       │   │
 │  │  └─────────────┘ └─────────────┘ └─────────────┘       │   │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │   │
-│  │  │   Bandit    │ │   Memory    │ │  Embeddings │       │   │
-│  │  │  Learning   │ │   System    │ │   Service   │       │   │
-│  │  └─────────────┘ └─────────────┘ └─────────────┘       │   │
+│  │                                                     │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -90,17 +74,7 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
                     └──────────────────┘
                               │
                               ▼
-                    ┌──────────────────┐
-                    │   Contextual     │
-                    │   Bandit         │
-                    └──────────────────┘
-                              │
-                              ▼
-                    ┌──────────────────┐
-                    │   Vector         │
-                    │   Memory         │
-                    │   (pgvector)     │
-                    └──────────────────┘
+ 
 ```
 
 ## 📦 Project Layout
@@ -114,7 +88,7 @@ PspRouter/
 ├── PspRouter.Tests/         # Unit tests
 ├── PspRouter.sln           # Solution file
 ├── README.md               # Documentation
-└── setup-database.sql      # Database setup
+ 
 ```
 
 ### 📚 **PspRouter.Lib** (Core Library)
@@ -122,39 +96,35 @@ PspRouter/
 - `DTOs.cs` – Data transfer objects and contracts
 - `Interfaces.cs` – Service abstractions and interfaces
 - `Tools.cs` – LLM tool implementations (`get_psp_health`, `get_fee_quote`)
-- `Bandit.cs` – Multi-armed bandit implementations (`IBandit`, `IContextualBandit`, `EpsilonGreedyBandit`, `ThompsonSamplingBandit`, `ContextualEpsilonGreedyBandit`)
-- `MemoryPgVector.cs` – `PgVectorMemory` implementation with pgvector (ensure schema, add/search)
 - `OpenAIChatClient.cs` – Chat wrapper with `response_format=json_object` and tool-calling loop
-- `EmbeddingsHelper.cs` – `OpenAIEmbeddings` service for vector embeddings
-- `CapabilityMatrix.cs` – Deterministic PSP support rules (method→PSP gating)
-- `PspRouter.Lib.csproj` – .NET 8 library with core dependencies (`Npgsql`, `OpenAI`, `Pgvector`, `Microsoft.Extensions.Logging.Abstractions`)
+- `PspRouter.Lib.csproj` – .NET 8 library with core dependencies (`OpenAI`, `Microsoft.Extensions.Logging.Abstractions`)
 
 ### 🚀 **PspRouter.API** (ASP.NET Core Web API)
 - `Program.cs` – **ASP.NET Core** application with dependency injection, configuration, and service registration
-- `Controllers/RoutingController.cs` – REST API endpoints for routing transactions and updating outcomes
+- `Controllers/RoutingController.cs` – REST API endpoints for routing transactions
 - `Dummies.cs` – Mock implementations for local testing and development
 - `appsettings.json` – Configuration file with logging and PSP router settings
 - `PspRouter.API.csproj` – .NET 8 Web API with ASP.NET Core dependencies (`Microsoft.AspNetCore.OpenApi`, `Swashbuckle.AspNetCore`, etc.)
 
 ### 🧪 **PspRouter.Tests** (Unit Tests)
-- `UnitTests.cs` – Unit test for core functionality (CapabilityMatrix, Bandit algorithms)
-- `IntegrationTests.cs` – Integration tests demonstrating complete routing flow with learning
+- `UnitTests.cs` – Unit test for core functionality (CapabilityProvider)
+- `IntegrationTests.cs` – Integration tests demonstrating routing flow
 - `PspRouter.Tests.csproj` – .NET 8 test project with xUnit framework
 
 ### 🗄️ **Database & Configuration**
-- `setup-database.sql` – PostgreSQL database setup script with pgvector extension
+ 
 
 ## 🏗️ Project Structure Benefits
 
 ### **📚 PspRouter.Lib (Core Library)**
-- **Reusable Business Logic**: Core routing algorithms, bandit learning, and memory systems
+- **Reusable Business Logic**: Core routing algorithms with LLM and deterministic fallback
 - **Clean Interfaces**: Well-defined contracts for all services
 - **Independent Testing**: Can be unit tested in isolation
 - **NuGet Package Ready**: Can be packaged and distributed
 - **Framework Agnostic**: No hosting dependencies, pure business logic
 
 ### **🚀 PspRouter.API (ASP.NET Core Web API)**
-- **RESTful API**: Clean HTTP endpoints for routing transactions and updating outcomes
+- **RESTful API**: Clean HTTP endpoints for routing transactions
 - **Swagger Documentation**: Interactive API documentation with OpenAPI specification
 - **Production Ready**: Structured logging, health checks, environment support
 - **Flexible Deployment**: Can be deployed as web app, service, or container
@@ -187,7 +157,7 @@ PspRouter/
                                                         │
                                                         ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Bandit        │◀───│   Fallback       │◀───│   LLM Failed?   │
+ 
 │   Learning      │    │   Router         │    │   (Parse Error) │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
         │                        │
@@ -218,7 +188,7 @@ PspRouter/
 └─────────────────┘    └──────────────────┘
 ```
 
-### 🎰 Bandit Learning Flow
+ 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Transaction   │───▶│   Extract        │───▶│   Calculate     │
@@ -297,8 +267,8 @@ PspRouter/
 
 - **🔄 PSP Router Decision Flow**: Shows the complete decision-making process from transaction request to final routing decision
 - **🧠 LLM Decision Process Flow**: Details how the LLM analyzes transactions and makes intelligent decisions
-- **🎰 Bandit Learning Flow**: Illustrates the contextual bandit learning and arm selection process
-- **🧠 Vector Memory Flow**: Shows how lessons are stored and retrieved using semantic search
+- // Bandit Learning Flow not applicable in this variant
+- // Vector Memory Flow not applicable in this variant
 - **🔄 System Integration Flow**: Demonstrates the ASP.NET Core Web API architecture and dependency injection
 - **🎯 Decision Tree Flow**: Provides a high-level view of the decision logic and fallback mechanisms
 
@@ -306,7 +276,7 @@ PspRouter/
 
 ### Prerequisites
 - .NET 8.0 SDK
-- PostgreSQL with pgvector extension
+- // PostgreSQL with pgvector extension not required in this variant
 - OpenAI API key
 
 ### 🏗️ **3-Project Architecture Benefits**
@@ -331,117 +301,19 @@ The application uses ASP.NET Core Web API, providing:
 - **Command Line Integration**: Built-in support for command line arguments
 - **Deployment Flexibility**: Can be deployed as web app, service, or container
 
-### 🗄️ **Database Access Strategy: Raw SQL vs Entity Framework**
-This project uses **raw SQL with Npgsql** instead of Entity Framework Core for several critical reasons:
 
-#### **Why Raw SQL is Optimal Here:**
-
-**🚀 Performance-Critical Operations:**
-- **Vector Similarity Search**: Complex pgvector operations require optimized SQL
-- **Analytics Queries**: Aggregation queries need precise control over execution plans
-- **High-Throughput**: Payment routing requires sub-millisecond database response times
-
-**🔧 Specialized Database Features:**
-- **pgvector Extension**: Vector operations (`<=>`, `cosine similarity`) not well-supported in EF
-- **Custom Indexes**: IVFFlat indexes for vector search require direct SQL control
-- **PostgreSQL-Specific**: Advanced features like `FILTER` clauses and window functions
-
-**📊 Complex Analytics Queries:**
-```sql
--- Example: Calculate authorization rates per PSP
-SELECT 
-    psp_name,
-    COUNT(*) FILTER (WHERE authorized = true) / COUNT(*) as auth_rate,
-    AVG(processing_time_ms) as avg_processing_time
-FROM transaction_outcomes 
-WHERE processed_at >= NOW() - INTERVAL '30 days'
-GROUP BY psp_name;
-```
-
-**⚡ Performance Benefits:**
-- **Direct Control**: No ORM overhead or query translation
-- **Optimized Queries**: Hand-tuned SQL for maximum performance
-- **Connection Pooling**: Direct Npgsql connection management
-- **Vector Operations**: Native pgvector support without abstraction layers
-
-#### **Type Safety Without EF:**
-We maintain type safety through:
-- **Entity Classes (POCOs)**: Strongly-typed data models
-- **Database Context Interface**: Clean abstraction over raw SQL
-- **Parameterized Queries**: SQL injection protection
-- **Compile-Time Checking**: Full IntelliSense and type validation
-
-#### **When EF Would Be Problematic:**
-- **Vector Operations**: EF doesn't understand pgvector syntax
-- **Complex Analytics**: LINQ translation would be inefficient
-- **Performance**: ORM overhead unacceptable for payment processing
-- **Custom Indexes**: EF migrations don't handle specialized indexes well
-
-#### **Best of Both Worlds:**
-- ✅ **Type Safety**: Entity classes provide compile-time checking
-- ✅ **Performance**: Raw SQL gives optimal database performance  
-- ✅ **Flexibility**: Direct access to all PostgreSQL features
-- ✅ **Maintainability**: Clean separation with database context interface
-- ✅ **Security**: Parameterized queries prevent SQL injection
-
-### 1. Database Setup
-
-#### Install PostgreSQL with pgvector
-```bash
-# Install PostgreSQL (Ubuntu/Debian)
-sudo apt update
-sudo apt install postgresql postgresql-contrib
-
-# Install pgvector extension
-sudo apt install postgresql-16-pgvector  # Adjust version as needed
-
-# Or using Docker
-docker run --name psp-router-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=psp_router -p 5432:5432 -d pgvector/pgvector:pg16
-```
-
-#### Create Database and Run Setup
-```sql
--- Connect to PostgreSQL as superuser
-sudo -u postgres psql
-
--- Create database
-CREATE DATABASE psp_router;
-
--- Create user (optional)
-CREATE USER psp_router_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE psp_router TO psp_router_user;
-```
-
-```bash
-# Run the setup script
-psql -U postgres -d psp_router -f setup-database.sql
-```
-
-#### Verify Setup
-```sql
--- Connect to the database
-psql -U postgres -d psp_router
-
--- Check if vector extension is installed
-SELECT * FROM pg_extension WHERE extname = 'vector';
-
--- Check if tables are created
-\dt
-
--- Check sample data
-SELECT key, content FROM psp_lessons LIMIT 5;
-```
+ 
 
 ### 2. Environment Configuration
 
 ```bash
 # Windows (PowerShell)
 $env:OPENAI_API_KEY="sk-your-openai-key"
-$env:PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
+$env:OPENAI_FT_MODEL="ft:gpt-4.1:your-org:psp-router:v1"
 
 # Linux/Mac
 export OPENAI_API_KEY="sk-your-openai-key"
-export PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
+export OPENAI_FT_MODEL="ft:gpt-4.1:your-org:psp-router:v1"
 ```
 
 ### 3. Configuration Management
@@ -449,7 +321,7 @@ export PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Data
 The application uses hierarchical configuration with the following precedence (highest to lowest):
 
 1. **Command Line Arguments**: `dotnet run -- --setting=value`
-2. **Environment Variables**: `OPENAI_API_KEY`, `PGVECTOR_CONNSTR`
+2. **Environment Variables**: `OPENAI_API_KEY`, `OPENAI_FT_MODEL`
 3. **appsettings.{Environment}.json**: Environment-specific settings
 4. **appsettings.json**: Default configuration
 
@@ -466,15 +338,7 @@ The application uses hierarchical configuration with the following precedence (h
   },
   "PspRouter": {
     "OpenAI": {
-      "Model": "gpt-4.1",
-      "EmbeddingModel": "text-embedding-3-large"
-    },
-    "Bandit": {
-      "Epsilon": 0.1,
-      "Algorithm": "ContextualEpsilonGreedy"
-    },
-    "Database": {
-      "TableName": "psp_lessons"
+      "FineTunedModel": "ft:gpt-4.1:your-org:psp-router:v1"
     }
   }
 }
@@ -490,9 +354,6 @@ The application uses hierarchical configuration with the following precedence (h
     }
   },
   "PspRouter": {
-    "Bandit": {
-      "Epsilon": 0.05
-    }
   }
 }
 ```
@@ -503,12 +364,11 @@ The application uses proper dependency injection with appropriate service lifeti
 
 ```csharp
 // Singleton services (shared across the application)
+services.AddSingleton<ICapabilityProvider, DummyCapabilityProvider>();
 services.AddSingleton<IHealthProvider, DummyHealthProvider>();
 services.AddSingleton<IFeeQuoteProvider, DummyFeeProvider>();
-services.AddSingleton<IChatClient>(provider => new OpenAIChatClient(apiKey, model: "gpt-4.1"));
-services.AddSingleton<OpenAIEmbeddings>(provider => new OpenAIEmbeddings(apiKey, model: "text-embedding-3-large"));
-services.AddSingleton<IVectorMemory>(provider => new PgVectorMemory(pgConn, table: "psp_lessons"));
-services.AddSingleton<IContextualBandit>(provider => new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: logger));
+services.AddSingleton<IChatClient>(provider => new OpenAIChatClient(apiKey, model: Environment.GetEnvironmentVariable("OPENAI_FT_MODEL") ?? builder.Configuration["PspRouter:OpenAI:FineTunedModel"] ?? "gpt-4.1"));
+// Embeddings, vector memory, and bandit registrations removed in this variant
 
 // Scoped services (per request/operation)
 services.AddScoped<PspRouter.PspRouter>(provider => /* ... */);
@@ -554,7 +414,6 @@ dotnet test PspRouter.Tests
 === PSP Router API Ready ===
 API endpoints available at:
   POST /api/routing/route - Route a transaction
-  POST /api/routing/outcome - Update transaction outcome
   GET  /api/routing/health - Check service health
   Swagger UI: https://localhost:7xxx/swagger
 
@@ -608,25 +467,7 @@ Content-Type: application/json
 }
 ```
 
-#### Update Transaction Outcome
-```bash
-POST /api/routing/outcome
-Content-Type: application/json
-
-{
-  "decisionId": "decision-123",
-  "pspName": "Adyen",
-  "authorized": true,
-  "transactionAmount": 150.00,
-  "feeAmount": 3.30,
-  "processingTimeMs": 1200,
-  "riskScore": 15,
-  "processedAt": "2024-12-01T12:00:00Z",
-  "errorCode": null,
-  "errorMessage": null
-}
-```
-
+/
 #### Check Service Health
 ```bash
 GET /api/routing/health
@@ -687,20 +528,6 @@ curl -X POST https://localhost:7000/api/routing/route \
 
 # Test health endpoint
 curl https://localhost:7000/api/routing/health
-
-# Update transaction outcome
-curl -X POST https://localhost:7000/api/routing/outcome \
-  -H "Content-Type: application/json" \
-  -d '{
-    "decisionId": "decision-123",
-    "pspName": "Adyen",
-    "authorized": true,
-    "transactionAmount": 150.00,
-    "feeAmount": 3.30,
-    "processingTimeMs": 1200,
-    "riskScore": 15,
-    "processedAt": "2024-12-01T12:00:00Z"
-  }'
 ```
 
 #### PowerShell Examples
@@ -741,38 +568,15 @@ Invoke-RestMethod -Uri "https://localhost:7000/api/routing/health" -Method GET
 
 #### Basic Routing
 ```csharp
-var router = new PspRouter(chatClient, healthProvider, feeProvider, tools, bandit, memory, logger);
+var router = new PspRouter(chatClient, healthProvider, feeProvider, tools, logger);
 var decision = await router.DecideAsync(context, cancellationToken);
-```
-
-#### Learning from Outcomes
-```csharp
-var outcome = new TransactionOutcome(/* transaction results */);
-router.UpdateReward(decision, outcome);
 ```
 
 ## 🔧 Configuration
 
-### Bandit Learning
-```csharp
-// Contextual Epsilon-Greedy (recommended)
-var bandit = new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger);
-
-// Standard Epsilon-Greedy
-var bandit = new EpsilonGreedyBandit(epsilon: 0.1);
-
-// Thompson Sampling (Bayesian)
-var bandit = new ThompsonSamplingBandit();
-```
-
 ### LLM Configuration
 ```csharp
 var chatClient = new OpenAIChatClient(apiKey, model: "gpt-4.1");
-```
-
-### Memory Configuration
-```csharp
-var memory = new PgVectorMemory(connectionString, table: "psp_lessons");
 ```
 
 ## 📊 Decision Factors
@@ -783,7 +587,7 @@ The system considers multiple factors in routing decisions:
 2. **Authorization Success Rates** (historical performance)
 3. **Fee Optimization** (minimize transaction costs)
 4. **Merchant Preferences** (configured preferences)
-5. **Historical Performance** (vector memory insights)
+5. **Historical Performance** (if provided by external stats)
 6. **Real-time Health** (PSP availability and latency)
 
 ## 🎯 Reward Calculation
@@ -814,13 +618,11 @@ reward = baseAuthReward - feePenalty + speedBonus - riskPenalty
 
 ## 🔄 Learning Loop
 
-1. **Route Decision**: LLM or bandit selects PSP
+1. **Route Decision**: LLM selects PSP (with deterministic fallback)
 2. **Transaction Processing**: PSP processes payment
 3. **Outcome Capture**: Success/failure, fees, timing
 4. **Reward Calculation**: Multi-factor reward computation
-5. **Learning Update**: Bandit algorithm updates
-6. **Memory Storage**: Lessons stored in vector database
-7. **Continuous Improvement**: Better decisions over time
+// No in-service learning in this variant
 
 ## 🚀 Production Deployment
 
@@ -829,23 +631,14 @@ reward = baseAuthReward - feePenalty + speedBonus - riskPenalty
 # Production OpenAI API key
 export OPENAI_API_KEY="sk-prod-your-key"
 
-# Production database connection
-export PGVECTOR_CONNSTR="Host=prod-db-host;Username=psp_router;Password=secure-password;Database=psp_router;Port=5432;SSL Mode=Require"
+ 
 ```
 
-### Database Security
-```sql
--- Create production user with limited privileges
-CREATE USER psp_router_prod WITH PASSWORD 'secure_password';
-GRANT CONNECT ON DATABASE psp_router TO psp_router_prod;
-GRANT USAGE ON SCHEMA public TO psp_router_prod;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO psp_router_prod;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO psp_router_prod;
-```
+ 
 
 ### Scaling Considerations
 - **Horizontal Scaling**: Stateless design supports multiple instances
-- **Database Optimization**: Proper indexing for vector searches
+ 
 - **Caching**: Consider Redis for frequently accessed data
 - **Load Balancing**: Distribute traffic across PSP endpoints
 
@@ -884,19 +677,7 @@ public async Task Learning_ShouldImproveOverTime()
 #### Core Classes
 
 ##### `PspRouter` (in `Router.cs`)
-Main routing engine with LLM and bandit integration.
-
-##### `ContextualEpsilonGreedyBandit` (in `Bandit.cs`)
-Enhanced contextual bandit with transaction feature awareness.
-
-##### `EpsilonGreedyBandit` (in `Bandit.cs`)
-Standard multi-armed bandit with epsilon-greedy exploration strategy.
-
-##### `ThompsonSamplingBandit` (in `Bandit.cs`)
-Bayesian multi-armed bandit with Thompson sampling.
-
-##### `PgVectorMemory` (in `MemoryPgVector.cs`)
-Vector database integration for semantic memory.
+Main routing engine with LLM and deterministic fallback.
 
 ##### `OpenAIChatClient` (in `OpenAIChatClient.cs`)
 LLM integration with tool calling support.
@@ -906,16 +687,13 @@ LLM integration with tool calling support.
 ##### `DecideAsync(RouteContext, CancellationToken)`
 Makes routing decision using LLM or fallback logic.
 
-##### `UpdateReward(RouteDecision, TransactionOutcome)`
-Updates bandit learning with transaction outcome.
-
 ### 🚀 PspRouter.API (ASP.NET Core Web API)
 
 #### `Program.cs`
 ASP.NET Core application with dependency injection and service registration.
 
 #### `Controllers/RoutingController.cs`
-REST API controller with endpoints for routing transactions and updating outcomes.
+REST API controller with endpoint for routing transactions.
 
 #### `DummyHealthProvider` & `DummyFeeProvider`
 Mock implementations for local testing and development.
@@ -925,13 +703,10 @@ Mock implementations for local testing and development.
 #### `PspRouterTests`
 Test cases for core functionality including:
 - CapabilityMatrix validation
-- Bandit algorithm testing
-- Contextual bandit feature handling
 
 #### `IntegrationTests`
 Integration tests demonstrating complete routing flow:
-- End-to-end routing with LLM and bandit learning
-- Transaction outcome simulation and learning updates
+- End-to-end routing with LLM decision and deterministic fallback
 - Complete system integration testing
 
 #### `AddAsync(string, string, Dictionary, float[], CancellationToken)`
@@ -946,7 +721,7 @@ Searches vector memory for relevant lessons.
 ## 📚 **Additional Documentation**
 
 For detailed explanations of the AI/ML concepts used in this system, see:
-- **[AI-ML-CONCEPTS.md](AI-ML-CONCEPTS.md)** - Comprehensive guide to Multi-Armed Bandits, LLM, Vector Search, and other AI/ML concepts explained for programmers
+- **[AI-ML-CONCEPTS.md](AI-ML-CONCEPTS.md)**
 
 ---
 
