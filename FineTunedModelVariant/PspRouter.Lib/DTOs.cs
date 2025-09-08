@@ -61,12 +61,23 @@ public record TransactionOutcome(
 );
 
 public record TrainingData(
-    int Id,
-    string SystemPrompt,
-    string UserInstruction,
-    string ContextJson,
-    string ExpectedResponse,
-    DateTime CreatedAt,
-    string? Source = null,
-    bool IsValidated = false
+    long PaymentTransactionId,
+    string OrderId,
+    decimal Amount,
+    long PaymentGatewayId,
+    long PaymentMethodId,
+    long CurrencyId,
+    long? CountryId,
+    string? PaymentCardBin,
+    long? ThreeDSTypeId,
+    bool IsTokenized,
+    long PaymentTransactionStatusId,
+    string? GatewayStatusReason,
+    string? GatewayResponseCode,
+    bool IsReroutedFlag,
+    long? PaymentRoutingRuleId,
+    DateTime DateCreated,
+    DateTime? DateStatusLastUpdated,
+    string? PspReference
 );
+

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using OpenAI;
 using PspRouter.Lib;
+using DotNetEnv;
 
 namespace PspRouter.Trainer;
 
@@ -11,6 +12,16 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
+        // Load .env file if it exists
+        try
+        {
+            Env.Load();
+        }
+        catch (FileNotFoundException)
+        {
+            // .env file not found, that's okay - use other sources
+        }
+        
         var host = CreateHostBuilder(args).Build();
         
         var logger = host.Services.GetRequiredService<ILogger<Program>>();
@@ -42,7 +53,7 @@ public class Program
                 var configuration = context.Configuration;
                 
                 // Register OpenAI client
-                var openAiApiKey = configuration["PspRouter:OpenAI:ApiKey"] ?? 
+                var openAiApiKey = configuration["OPENAI_API_KEY"] ?? 
                                  throw new InvalidOperationException("OpenAI API key not found in configuration");
                 
                 services.AddSingleton<OpenAIClient>(provider => new OpenAIClient(openAiApiKey));

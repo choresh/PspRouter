@@ -101,13 +101,62 @@ public class TrainingService : ITrainingService
         
         foreach (var data in trainingData)
         {
+            // Create training examples from real transaction data
+            var systemPrompt = "You are a payment service provider (PSP) routing assistant. Your job is to analyze transaction context and recommend the best PSP for processing.";
+            
+            var userInstruction = $"Route this transaction: Order {data.OrderId}, Amount: {data.Amount}, PaymentGateway: {data.PaymentGatewayId}, Method: {data.PaymentMethodId}, Currency: {data.CurrencyId}, Country: {data.CountryId}, Card BIN: {data.PaymentCardBin}, 3DS: {data.ThreeDSTypeId}, Tokenized: {data.IsTokenized}";
+            
+            var contextJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                orderId = data.OrderId,
+                amount = data.Amount,
+                paymentGatewayId = data.PaymentGatewayId,
+                paymentMethodId = data.PaymentMethodId,
+                currencyId = data.CurrencyId,
+                countryId = data.CountryId,
+                paymentCardBin = data.PaymentCardBin,
+                threeDSTypeId = data.ThreeDSTypeId,
+                isTokenized = data.IsTokenized,
+                isRerouted = data.IsReroutedFlag,
+                routingRuleId = data.PaymentRoutingRuleId
+            });
+            
+            // Determine success based on status IDs
+            var isSuccessful = data.PaymentTransactionStatusId == 5 || // Authorized
+                              data.PaymentTransactionStatusId == 7 || // Captured  
+                              data.PaymentTransactionStatusId == 9;   // Settled
+            
+            var statusName = data.PaymentTransactionStatusId switch
+            {
+                5 => "Authorized",
+                7 => "Captured", 
+                9 => "Settled",
+                11 => "Refused",
+                15 => "ChargeBack",
+                17 => "Error",
+                22 => "AuthorizationFailed",
+                _ => $"Status_{data.PaymentTransactionStatusId}"
+            };
+            
+            var expectedResponse = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                recommendedPsp = data.PaymentGatewayId,
+                reasoning = $"Based on transaction context, PSP {data.PaymentGatewayId} was selected and resulted in {statusName}",
+                success = isSuccessful,
+                status = statusName,
+                statusId = data.PaymentTransactionStatusId,
+                pspReference = data.PspReference,
+                gatewayResponse = data.GatewayResponseCode,
+                wasRerouted = data.IsReroutedFlag
+            });
+            
             var trainingExample = new
             {
                 messages = new[]
                 {
-                    new { role = "system", content = data.SystemPrompt },
-                    new { role = "user", content = data.UserInstruction },
-                    new { role = "assistant", content = data.ExpectedResponse }
+                    new { role = "system", content = systemPrompt },
+                    new { role = "user", content = userInstruction },
+                    new { role = "assistant", content = expectedResponse }
                 }
             };
             
