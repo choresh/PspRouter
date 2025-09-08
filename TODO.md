@@ -1,4 +1,4 @@
-# 🚀 PSP Router - Implementation TODO List (Pre-Trained LLM Variant)
+# 🚀 PSP Router - Implementation TODO List (Fine-Tuned Model Variant)
 
 ## 📋 Overview
 This document outlines all the components that need to be implemented or replaced to complete the PSP Router solution. The system is currently functional with dummy implementations and needs real data integrations for production use.
@@ -9,7 +9,7 @@ This document outlines all the components that need to be implemented or replace
 
 ### **📋 Implementation Priority Order**
 1. Core wiring: environment, DI, prompt/schema, timeouts/fallback
-2. Replace dummies: Health Provider, Fee Provider
+2. Replace dummies: Health Provider, Fee Provider, Capability Provider
 3. Inputs & guardrails: capability matrix, PSP snapshots, preferences
 4. Observability: logging, metrics, tracing; robust error handling
 5. Testing: integration and performance (latency + fallback)
@@ -44,15 +44,22 @@ This document outlines all the components that need to be implemented or replace
 - [ ] Create `.env` file or configure in your deployment environment
 - [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
 
-#### LLM Setup (Pre-trained model)
-- [ ] Set model name in DI (`OpenAIChatClient`, e.g., gpt-4.1)
+#### LLM Setup
+- [ ] Set fine-tuned model ID via `OPENAI_FT_MODEL` or `PspRouter:OpenAI:FineTunedModel`
 - [ ] Confirm strict `RouteDecision` JSON schema in `BuildSystemPrompt()`
-- [ ] Add optional few-shot examples for reasoning quality
-- [ ] Configure LLM timeout and fallback threshold (e.g., 800–1200 ms)
-- [ ] Enforce strict JSON validation before accepting model output
-- [ ] Ensure tool registration for health/fees is active
-- [ ] Observability: log latency, token usage, fallback rate, parse errors
-- [ ] Tests: unit (schema/fallback), integration (end-to-end), performance (P95 latency)
+- [ ] (Optional) few-shot examples to reinforce reasoning style
+- [ ] Configure timeout/fallback (e.g., 800–1200 ms) and strict JSON validation
+- [ ] Ensure tools for health/fees are active
+- [ ] Observability: latency, tokens, fallback rate, schema errors
+- [ ] Tests: unit (schema/fallback), integration (end-to-end), performance (P95)
+
+#### Fine-tuning workflow (optional but recommended)
+- [ ] Data prep: collect de-PII’d labeled decisions (inputs → `RouteDecision`)
+- [ ] Upload training file (API: Files.Upload)
+- [ ] Create fine-tune job (API: FineTuning.CreateJob)
+- [ ] Track job and retrieve model id (API: FineTuning.GetJob)
+- [ ] Offline eval against holdout; fix errors; iterate
+- [ ] Shadow/A-B test in staging; then production rollout with monitoring
 
 ---
 
@@ -119,88 +126,77 @@ public class RealFeeProvider : IFeeQuoteProvider
 }
 ```
 
-### 4. **Update Service Registration** ⚠️ **REQUIRED**
+### 4. **Capability Provider Implementation** ❌ **DUMMY**
+**File:** `PspRouter.API/Dummies.cs` (lines 31-40)
+
+**Current:** Returns hardcoded results
+
+**Replace with:**
+```csharp
+public class RealCapabilityProvider : ICapabilityProvider
+{
+    // TODO: Load capability rules from configuration at startup (per PSP)
+    // - AllowedMethods: Card, PayPal, KlarnaPayLater
+    // - AllowedSchemes (for Card): Visa, Mastercard, Amex
+    // - Supports3DS / Requires3DS flags
+    // - Optional allowlists: MerchantCountries, Currencies
+    // Pseudocode:
+    // private readonly CapabilityConfig _config;
+    // public RealCapabilityProvider(CapabilityConfig config) { _config = config; }
+    // public bool Supports(string psp, RouteInput tx) {
+    //   if (!_config.Providers.TryGetValue(psp, out var p)) return false;
+    //   if (!p.AllowedMethods.Contains(tx.Method)) return false;
+    //   if (tx.Method == PaymentMethod.Card && p.AllowedSchemes?.Count > 0 && !p.AllowedSchemes.Contains(tx.Scheme)) return false;
+    //   if (tx.Method == PaymentMethod.Card && tx.SCARequired && p.Requires3DS && p.Supports3DS == false) return false;
+    //   if (p.AllowedMerchantCountries?.Count > 0 && !p.AllowedMerchantCountries.Contains(tx.MerchantCountry)) return false;
+    //   if (p.AllowedCurrencies?.Count > 0 && !p.AllowedCurrencies.Contains(tx.Currency)) return false;
+    //   return true;
+    // }
+
+      throw new NotImplementedException("Real capability provider not implemented");
+}
+```
+
+### 5. **Update Service Registration** ⚠️ **REQUIRED**
 **File:** `PspRouter.API/Program.cs` (lines 53-54)
 
 **Replace:**
 ```csharp
 // ❌ CURRENT (DUMMY):
+builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.DummyCapabilityProvider>();
 builder.Services.AddSingleton<IHealthProvider, PspRouter.API.DummyHealthProvider>();
 builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.DummyFeeProvider>();
 
 // ✅ REPLACE WITH:
+builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.RealCapabilityProvider>();
 builder.Services.AddSingleton<IHealthProvider, PspRouter.API.RealHealthProvider>();
 builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>();
 ```
 
 ---
 
-## 📊 **Phase 3: Real Data Integration**
-
-### 5. **Merchant Preferences System** ❌ **EMPTY**
-**Current Issue:** `MerchantPrefs` and `SegmentStats` are empty
-
-**Implementation Required:**
-```csharp
-public class MerchantPreferencesProvider
-{
-    public async Task<Dictionary<string, string>> GetPreferencesAsync(
-        string merchantId, 
-        CancellationToken ct)
-    {
-        // TODO: Implement merchant preference retrieval
-        // - Preferred PSPs
-        // - Fee tolerance
-        // - Risk preferences
-        // - Geographic preferences
-        
-        throw new NotImplementedException("Merchant preferences not implemented");
-    }
-}
-```
-
-### 6. **Transaction Segmentation** ❌ **MISSING**
-**Implementation Required:**
-```csharp
-public class SegmentAnalytics
-{
-    public Dictionary<string, double> CalculateSegmentStats(RouteInput tx)
-    {
-        // TODO: Implement transaction segmentation
-        // - Risk-based segments
-        // - Geographic segments
-        // - Amount-based segments
-        // - Payment method segments
-        
-        return new Dictionary<string, double>();
-    }
-}
-```
-
----
-
 ## 🏗️ **Phase 4: Production Features**
 
-### 8. **Monitoring & Observability** ❌ **BASIC**
+### 6. **Monitoring & Observability** ❌ **BASIC**
 - [ ] Add structured logging with correlation IDs
 - [ ] Implement health check endpoints for all PSPs
 - [ ] Add metrics collection (authorization rates, response times)
 - [ ] Set up alerting for PSP failures
 - [ ] Add distributed tracing
 
-### 9. **Caching Layer** ❌ **MISSING**
+### 7. **Caching Layer** ❌ **MISSING**
 - [ ] Implement Redis caching for PSP health status
 - [ ] Cache fee calculations with TTL
 - [ ] Cache merchant preferences
 - [ ] Implement cache invalidation strategies
 
-### 10. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
+### 8. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
 - [ ] Add rate limiting for API endpoints
 - [ ] Implement circuit breakers for PSP calls
 - [ ] Add retry policies with exponential backoff
 - [ ] Implement bulkhead pattern for PSP isolation
 
-### 11. **Security Enhancements** ⚠️ **BASIC**
+### 9. **Security Enhancements** ⚠️ **BASIC**
 - [ ] Add API authentication/authorization
 - [ ] Implement request/response encryption
 - [ ] Add input validation and sanitization
@@ -210,24 +206,22 @@ public class SegmentAnalytics
 
 ## 🧪 **Phase 5: Testing & Quality**
 
-### 12. **Integration Tests** ⚠️ **PARTIAL**
+### 10. **Integration Tests** ⚠️ **PARTIAL**
 **File:** `PspRouter.Tests/IntegrationTests.cs`
 
 **Current:** Uses dummy implementations
 
 **Enhance with:**
-- [ ] Real PSP API integration tests (with test accounts)
- 
- 
+- [ ] Real PSP API integration tests (with test accounts) 
 - [ ] End-to-end routing flow tests
 
-### 13. **Performance Testing** ❌ **MISSING**
+### 11. **Performance Testing** ❌ **MISSING**
 - [ ] Load testing for routing decisions
 - [ ] Stress testing for concurrent requests
 - [ ] Memory usage profiling
  
 
-### 14. **Data Quality Tests** ❌ **MISSING**
+### 12. **Data Quality Tests** ❌ **MISSING**
 - [ ] PSP data validation tests
 - [ ] Fee calculation accuracy tests
 - [ ] Health status consistency tests
@@ -237,19 +231,19 @@ public class SegmentAnalytics
 
 ## 🔄 **Phase 6: Deployment & Operations**
 
-### 15. **Containerization** ❌ **MISSING**
+### 13. **Containerization** ❌ **MISSING**
 - [ ] Create Dockerfile for API
  
 - [ ] Add health checks to containers
 - [ ] Configure multi-stage builds
 
-### 16. **CI/CD Pipeline** ❌ **MISSING**
+### 14. **CI/CD Pipeline** ❌ **MISSING**
 - [ ] Set up automated testing pipeline
 - [ ] Add code quality checks (SonarQube)
 - [ ] Implement automated deployment
 - [ ] Add rollback capabilities
 
-### 17. **Configuration Management** ⚠️ **BASIC**
+### 15. **Configuration Management** ⚠️ **BASIC**
 - [ ] Implement configuration validation
 - [ ] Add environment-specific configs
 - [ ] Implement feature flags
@@ -259,19 +253,19 @@ public class SegmentAnalytics
 
 ## 📈 **Phase 7: Advanced Features**
 
-### 18. **Machine Learning Enhancements** ❌ **BASIC**
+### 16. **Machine Learning Enhancements** ❌ **BASIC**
 - [ ] Implement A/B testing framework
 - [ ] Add model performance monitoring
 - [ ] Implement online learning for bandits
 - [ ] Add feature engineering pipeline
 
-### 19. **Analytics & Reporting** ❌ **MISSING**
+### 17. **Analytics & Reporting** ❌ **MISSING**
 - [ ] Implement routing decision analytics
 - [ ] Add PSP performance dashboards
 - [ ] Create merchant-specific reports
 - [ ] Implement cost optimization insights
 
-### 20. **Multi-Region Support** ❌ **MISSING**
+### 18. **Multi-Region Support** ❌ **MISSING**
 - [ ] Implement geographic routing
 - [ ] Add region-specific PSP preferences
 - [ ] Implement data residency compliance
@@ -372,6 +366,7 @@ public class SegmentAnalytics
 - [ ] **ASP.NET Core Web API Integration**
   ```csharp
   services.AddScoped<PspRouter.Lib.PspRouter>();
+  services.AddSingleton<ICapabilityProvider, YourCapabilityProvider>();
   services.AddSingleton<IHealthProvider, YourHealthProvider>();
   services.AddSingleton<IFeeQuoteProvider, YourFeeProvider>();
   ```
@@ -386,101 +381,5 @@ The library has minimal external dependencies:
 ### **🔧 Customization & Extensions**
 
  
-
 #### **Adding New PSPs**
-- [ ] Update `CapabilityMatrix.Supports()` method
-- [ ] Implement health and fee providers
-- [ ] Add PSP-specific logic to reward calculation
-- [ ] Update system prompts with new PSP characteristics
-
-#### **Custom Reward Functions**
-- [ ] Implement custom reward calculation logic
-- [ ] Test reward function with historical data
-- [ ] Validate reward function performance
-
-### **📈 Performance Optimization**
-
-#### **Caching Strategy**
-- [ ] **PSP Health**: Cache health status for 30 seconds
-- [ ] **Fee Tables**: Cache fee data for 5 minutes
- 
-
-#### **Database Optimization**
-- [ ] Optimize vector search performance with proper indexing
-  ```sql
-  CREATE INDEX CONCURRENTLY psp_lessons_embedding_idx 
-  ON psp_lessons USING ivfflat (embedding vector_cosine_ops) 
-  WITH (lists = 100);
-  ```
-- [ ] Analyze tables for better query planning
-- [ ] Configure connection pooling parameters
-
-#### **Connection Pooling**
-- [ ] Configure pooling parameters in connection string
-  ```
-  "Host=localhost;Username=postgres;Password=postgres;Database=psp_router;Pooling=true;MinPoolSize=5;MaxPoolSize=20"
-  ```
-
-### **🚨 Troubleshooting Guide**
-
-#### **Common Issues & Solutions**
-
-**1. Database Connection Failed**
-```
-Error: 3D000: database "psp_router" does not exist
-```
-- [ ] Create the database using the setup script
-
-**2. Vector Extension Not Found**
-```
-Error: extension "vector" does not exist
-```
- 
-
-**3. OpenAI API Key Invalid**
-```
-Error: Invalid API key
-```
-- [ ] Verify your API key and ensure it has sufficient credits
-
-**4. Permission Denied**
-```
-Error: permission denied for table psp_lessons
-```
-- [ ] Grant proper permissions to your database user
-
-#### **Debug Mode**
-- [ ] Enable debug logging: `export DOTNET_ENVIRONMENT=Development`
-- [ ] Run with verbose logging: `dotnet run --verbosity detailed`
-
-### **🔒 Security Implementation**
-
-#### **API Key Security**
-- [ ] Never commit API keys to version control
-- [ ] Use environment variables or secure key management
-- [ ] Rotate keys regularly
-
-#### **Database Security**
-- [ ] Use strong passwords
-- [ ] Enable SSL connections in production
-- [ ] Restrict database access by IP
-- [ ] Regular security updates
-
-#### **Network Security**
-- [ ] Use VPN or private networks for database access
-- [ ] Implement rate limiting
-- [ ] Monitor for suspicious activity
-
-### **💾 Backup and Recovery Setup**
-
-#### **Database Backup**
-- [ ] Create backup script: `pg_dump -U postgres -h localhost psp_router > psp_router_backup.sql`
-- [ ] Restore backup script: `psql -U postgres -h localhost psp_router < psp_router_backup.sql`
-
-#### **Automated Backups**
-- [ ] Add to crontab for daily backups:
-  ```bash
-  0 2 * * * pg_dump -U postgres psp_router | gzip > /backups/psp_router_$(date +\%Y\%m\%d).sql.gz
-  ```
-
----
+- [ ] Implement/update health, capability and fee providers

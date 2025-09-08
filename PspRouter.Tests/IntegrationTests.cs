@@ -6,10 +6,12 @@ namespace PspRouter.Tests;
 
 public class IntegrationTests
 {
+    private readonly ICapabilityProvider capability = new PspRouter.API.DummyCapabilityProvider();
+
     [Fact]
     public async Task TestCompleteRoutingFlow()
     {
-        // This test demonstrates the complete PSP routing system (pre-trained model variant)
+        // This test demonstrates the complete PSP routing system
         
         // Arrange - Create mock services
         var healthProvider = new PspRouter.API.DummyHealthProvider();
@@ -64,7 +66,7 @@ public class IntegrationTests
             // Simulate transaction outcome
             var outcome = SimulateRealisticOutcome(decision, tx);
             
-            // Pre-trained model variant: no online learning update
+            // Fine-tuned model variant: no online learning update
             Assert.True(true);
         }
     }
@@ -74,19 +76,19 @@ public class IntegrationTests
         var candidates = new List<PspSnapshot>();
         
         // Add supported PSPs based on capability matrix
-        if (CapabilityMatrix.Supports("Adyen", tx))
+        if (this.capability.Supports("Adyen", tx))
         {
             var (healthStatus, latency) = await health.GetAsync("Adyen", CancellationToken.None);
             candidates.Add(new("Adyen", true, healthStatus, GetRealisticAuthRate(tx, "Adyen"), latency, GetRealisticFeeBps(tx, "Adyen"), true, true));
         }
         
-        if (CapabilityMatrix.Supports("Stripe", tx))
+        if (capability.Supports("Stripe", tx))
         {
             var (healthStatus, latency) = await health.GetAsync("Stripe", CancellationToken.None);
             candidates.Add(new("Stripe", true, healthStatus, GetRealisticAuthRate(tx, "Stripe"), latency, GetRealisticFeeBps(tx, "Stripe"), true, true));
         }
         
-        if (CapabilityMatrix.Supports("Klarna", tx))
+        if (capability.Supports("Klarna", tx))
         {
             var (healthStatus, latency) = await health.GetAsync("Klarna", CancellationToken.None);
             candidates.Add(new("Klarna", true, healthStatus, GetRealisticAuthRate(tx, "Klarna"), latency, GetRealisticFeeBps(tx, "Klarna"), true, true));

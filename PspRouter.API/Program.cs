@@ -46,13 +46,14 @@ builder.Services.AddSwaggerGen(c =>
 // Configure PSP Router services
 var configuration = builder.Configuration;
 var apiKey = configuration["OPENAI_API_KEY"] ?? "sk-...";
+var ftModel = configuration["OPENAI_FT_MODEL"] ?? configuration["PspRouter:OpenAI:FineTunedModel"] ?? "gpt-4.1";
 
 // === Register Core Services ===
+builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.DummyCapabilityProvider>();
 builder.Services.AddSingleton<IHealthProvider, PspRouter.API.DummyHealthProvider>();
 builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.DummyFeeProvider>();
 builder.Services.AddSingleton<IChatClient>(provider => 
-    new OpenAIChatClient(apiKey, model: "gpt-4.1"));
-// No vector DB or bandit registration for pre-trained model variant
+    new OpenAIChatClient(apiKey, model: ftModel));
 
 // === Register Router as Scoped (for request-based operations) ===
 builder.Services.AddScoped<PspRouter.Lib.PspRouter>(provider =>
@@ -60,6 +61,7 @@ builder.Services.AddScoped<PspRouter.Lib.PspRouter>(provider =>
     var chat = provider.GetRequiredService<IChatClient>();
     var health = provider.GetRequiredService<IHealthProvider>();
     var fees = provider.GetRequiredService<IFeeQuoteProvider>();
+    var capability = provider.GetRequiredService<ICapabilityProvider>();
     var logger = provider.GetRequiredService<ILogger<PspRouter.Lib.PspRouter>>();
     
     var tools = new List<IAgentTool>
@@ -83,8 +85,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
-
-// No vector DB initialization in pre-trained model variant
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 

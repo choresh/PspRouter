@@ -1,14 +1,14 @@
-# 🚀 PSP Router - Intelligent Payment Routing System (Pre-Trained LLM Variant)
+# 🚀 PSP Router - Intelligent Payment Routing System (Fine-Tuned Model variant)
 
 ## 🎯 Purpose
-Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using a pre-trained **LLM-based decision engine** with deterministic fallback.
+Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using a **fine-tuned LLM-based decision engine** with deterministic fallback.
 
 ## 🏗 Solution Overview
 - **3-Project Architecture**: Clean separation with Library, Web API, and Tests
 - **ASP.NET Core Web API**: RESTful API with Swagger documentation
 - **Configuration Management**: JSON + environment variables with hierarchical config
 - **Deterministic Guardrails**: Capabilities, SCA/3DS, health checks
-- **LLM Decision Engine**: GPT-4 with tool calling and structured responses
+- **LLM Decision Engine**: Fine-tuned GPT-4 with tool calling and structured responses
  
 // Vector Memory System removed in this variant
 - **Graceful Fallback**: Deterministic scoring when LLM is unavailable
@@ -22,7 +22,7 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 - **Tool Integration**: Can call external APIs for real-time health and fee data
 - **Fallback Safety**: Graceful degradation to deterministic scoring when LLM is unavailable
 
-// Bandit learning and vector memory are not used in the pre-trained model variant
+// Bandit learning and vector memory are not used in this architecture
 
 ### 🏗️ **ASP.NET Core Web API Architecture**
 - **Enterprise-Grade Web API**: Built on ASP.NET Core for production deployment
@@ -97,7 +97,6 @@ PspRouter/
 - `Interfaces.cs` – Service abstractions and interfaces
 - `Tools.cs` – LLM tool implementations (`get_psp_health`, `get_fee_quote`)
 - `OpenAIChatClient.cs` – Chat wrapper with `response_format=json_object` and tool-calling loop
-- `CapabilityMatrix.cs` – Deterministic PSP support rules (method→PSP gating)
 - `PspRouter.Lib.csproj` – .NET 8 library with core dependencies (`OpenAI`, `Microsoft.Extensions.Logging.Abstractions`)
 
 ### 🚀 **PspRouter.API** (ASP.NET Core Web API)
@@ -108,7 +107,7 @@ PspRouter/
 - `PspRouter.API.csproj` – .NET 8 Web API with ASP.NET Core dependencies (`Microsoft.AspNetCore.OpenApi`, `Swashbuckle.AspNetCore`, etc.)
 
 ### 🧪 **PspRouter.Tests** (Unit Tests)
-- `UnitTests.cs` – Unit test for core functionality (CapabilityMatrix)
+- `UnitTests.cs` – Unit test for core functionality (CapabilityProvider)
 - `IntegrationTests.cs` – Integration tests demonstrating routing flow
 - `PspRouter.Tests.csproj` – .NET 8 test project with xUnit framework
 
@@ -310,11 +309,11 @@ The application uses ASP.NET Core Web API, providing:
 ```bash
 # Windows (PowerShell)
 $env:OPENAI_API_KEY="sk-your-openai-key"
- 
+$env:OPENAI_FT_MODEL="ft:gpt-4.1:your-org:psp-router:v1"
 
 # Linux/Mac
 export OPENAI_API_KEY="sk-your-openai-key"
- 
+export OPENAI_FT_MODEL="ft:gpt-4.1:your-org:psp-router:v1"
 ```
 
 ### 3. Configuration Management
@@ -322,7 +321,7 @@ export OPENAI_API_KEY="sk-your-openai-key"
 The application uses hierarchical configuration with the following precedence (highest to lowest):
 
 1. **Command Line Arguments**: `dotnet run -- --setting=value`
-2. **Environment Variables**: `OPENAI_API_KEY`
+2. **Environment Variables**: `OPENAI_API_KEY`, `OPENAI_FT_MODEL`
 3. **appsettings.{Environment}.json**: Environment-specific settings
 4. **appsettings.json**: Default configuration
 
@@ -339,8 +338,8 @@ The application uses hierarchical configuration with the following precedence (h
   },
   "PspRouter": {
     "OpenAI": {
-      "Model": "gpt-4.1",
-      
+      "FineTunedModel": "ft:gpt-4.1:your-org:psp-router:v1"
+    }
   }
 }
 ```
@@ -365,9 +364,10 @@ The application uses proper dependency injection with appropriate service lifeti
 
 ```csharp
 // Singleton services (shared across the application)
+services.AddSingleton<ICapabilityProvider, DummyCapabilityProvider>();
 services.AddSingleton<IHealthProvider, DummyHealthProvider>();
 services.AddSingleton<IFeeQuoteProvider, DummyFeeProvider>();
-services.AddSingleton<IChatClient>(provider => new OpenAIChatClient(apiKey, model: "gpt-4.1"));
+services.AddSingleton<IChatClient>(provider => new OpenAIChatClient(apiKey, model: Environment.GetEnvironmentVariable("OPENAI_FT_MODEL") ?? builder.Configuration["PspRouter:OpenAI:FineTunedModel"] ?? "gpt-4.1"));
 // Embeddings, vector memory, and bandit registrations removed in this variant
 
 // Scoped services (per request/operation)
@@ -467,8 +467,7 @@ Content-Type: application/json
 }
 ```
 
-// Outcome endpoint removed in pre-trained model variant
-
+/
 #### Check Service Health
 ```bash
 GET /api/routing/health
@@ -529,8 +528,6 @@ curl -X POST https://localhost:7000/api/routing/route \
 
 # Test health endpoint
 curl https://localhost:7000/api/routing/health
-
-# Outcome endpoint removed in pre-trained model variant
 ```
 
 #### PowerShell Examples
@@ -575,18 +572,12 @@ var router = new PspRouter(chatClient, healthProvider, feeProvider, tools, logge
 var decision = await router.DecideAsync(context, cancellationToken);
 ```
 
-// No online learning in pre-trained model variant
-
 ## 🔧 Configuration
-
-// Bandit learning removed in pre-trained model variant
 
 ### LLM Configuration
 ```csharp
 var chatClient = new OpenAIChatClient(apiKey, model: "gpt-4.1");
 ```
-
-// Vector memory removed in pre-trained model variant
 
 ## 📊 Decision Factors
 
@@ -688,8 +679,6 @@ public async Task Learning_ShouldImproveOverTime()
 ##### `PspRouter` (in `Router.cs`)
 Main routing engine with LLM and deterministic fallback.
 
-// Bandit and vector memory classes removed in pre-trained model variant
-
 ##### `OpenAIChatClient` (in `OpenAIChatClient.cs`)
 LLM integration with tool calling support.
 
@@ -697,8 +686,6 @@ LLM integration with tool calling support.
 
 ##### `DecideAsync(RouteContext, CancellationToken)`
 Makes routing decision using LLM or fallback logic.
-
-// No UpdateReward in pre-trained model variant
 
 ### 🚀 PspRouter.API (ASP.NET Core Web API)
 
@@ -716,7 +703,6 @@ Mock implementations for local testing and development.
 #### `PspRouterTests`
 Test cases for core functionality including:
 - CapabilityMatrix validation
-- Bandit-related tests removed in pre-trained model variant
 
 #### `IntegrationTests`
 Integration tests demonstrating complete routing flow:
@@ -735,7 +721,7 @@ Searches vector memory for relevant lessons.
 ## 📚 **Additional Documentation**
 
 For detailed explanations of the AI/ML concepts used in this system, see:
-- **[AI-ML-CONCEPTS.md](AI-ML-CONCEPTS.md)** - LLM decision engine and current pre-trained model approach
+- **[AI-ML-CONCEPTS.md](AI-ML-CONCEPTS.md)**
 
 ---
 

@@ -1,10 +1,8 @@
-# 📚 AI/ML Concepts Explained for Programmers (Pre-Trained LLM Variant)
+# 📚 AI/ML Concepts Explained for Programmers (Fine-Tuned Model variant)
 
 ## **A.0 Overview**
 This document explains the key AI/ML concepts used in the PSP Router in programmer-friendly terms. No advanced mathematics required - just practical understanding of how these concepts work in our payment routing system.
 
-Note: The current variant uses a pre-trained LLM with deterministic fallback only.
----
 
 ## 🧠 **A.7 LLM (Large Language Model): The AI Brain**
 
@@ -48,7 +46,7 @@ var decision = await llm.CompleteJsonAsync(systemPrompt, userInstruction, contex
 
 The LLM serves as the **brain** of the PSP Router, acting as an expert payment routing consultant that makes complex, context-aware decisions. It's the primary decision maker that considers multiple factors simultaneously and provides reasoning for its choices.
 
-### **Decision Flow (Pre-trained LLM variant)**
+### **Decision Flow**
 
 ```
 Transaction Request
@@ -181,37 +179,37 @@ The LLM transforms the PSP Router into an **intelligent payment expert** that:
 
 This makes the system capable of handling real-world payment routing scenarios that require expert-level decision making.
 
-## ⚙️ **A.10 Pre-Trained Model Approach (Current Variant)**
+## ⚙️ **A.10 Fine-Tuned Model Approach **
 
-### **What “pre-trained” means here**
-- Uses a foundation LLM (e.g., GPT-4) as-is (no fine-tuning)
-- Decision quality comes from: strict system prompt + structured JSON schema + rich runtime context (transaction, candidates, preferences)
-- No database required at runtime (stateless); deterministic fallback covers failures/timeouts
+### **What “fine-tuned” means here**
+- Starts from a foundation LLM (e.g., GPT-4) and adapts it with your labeled data
+- Decision quality comes from learned weights + strict JSON schema + runtime context
+- Still stateless at runtime; deterministic fallback covers failures/timeouts
 
 ### **Why this approach**
-- **Fast to iterate**: Update prompts/rules without retraining
-- **Explainable**: Returns structured reasoning aligned to schema
-- **Low ops overhead**: No model training pipeline or persistence needed
+- **Consistency**: Higher schema adherence and decision consistency
+- **Efficiency**: Potentially lower tokens and latency at scale
+- **Control**: Encodes domain style and format directly in weights
 
 ### **Trade-offs**
-- **Latency/cost**: External API call adds network latency and usage costs
-- **Domain consistency**: May be less consistent than a well fine-tuned domain model
-- **Hard limits**: Bound by provider rate limits and SLAs
+- **Data/MLOps**: Requires curated dataset, training, evaluation, versioning
+- **Drift**: Periodic re-training when rules or distributions change
+- **SLA**: Still subject to provider limits; keep deterministic fallback
 
-### **When to consider fine-tuning**
-- You have large, high-quality, labeled routing data (decisions + outcomes)
-- Stable domain rules (low change velocity) and strict consistency requirements
-- Need lower latency at very high volume or fully offline operation
+### **When to fine-tune**
+- You have enough high-quality labeled routing examples
+- Rules are relatively stable; require strong schema compliance
+- You want lower latency/cost at volume
 
 ### **Operational guidance**
-- **Timeouts/SLA**: Set aggressive LLM timeouts and a clear fallback threshold (e.g., 800–1200 ms)
-- **Retries**: Prefer single-attempt with fallback over multi-retries to protect latency budgets
-- **Observability**: Log model latency, token usage, and fallback rates
+- **Timeouts/SLA**: Set aggressive timeouts and fallback threshold (e.g., 800–1200 ms)
+- **Versioning**: Track fine-tune versions and rollout gradually (shadow/A-B)
+- **Observability**: Log model latency, token usage, fallback rates, schema errors
 
 ### **Evaluation checklist**
-- Authorization rate (primary), fee impact per route, error rates
-- Decision time (P50/P95), fallback frequency, reasoning validity/consistency
-- A/B or shadow testing against baselines before rollout
+- Authorization rate (primary), fee impact, error rates
+- Decision time (P50/P95), fallback frequency, schema validity
+- A/B or shadow tests before rollout
 
 ### **Security & privacy**
 - Avoid PII; send only needed aggregates (e.g., BIN prefix, scheme, ranges)

@@ -22,3 +22,8 @@ public interface IAgentTool
     string JsonSchema { get; }
     Task<string> InvokeAsync(string jsonArgs, CancellationToken ct);
 }
+
+public interface ICapabilityProvider
+{
+    bool Supports(string pspName, RouteInput tx);
+}
