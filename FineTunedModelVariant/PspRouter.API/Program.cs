@@ -43,8 +43,8 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Get .env file variables
-var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-var ftModel = Environment.GetEnvironmentVariable("OPENAI_FT_MODEL");
+var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
+var ftModel = Environment.GetEnvironmentVariable("OPENAI_FT_MODEL") ?? throw new InvalidOperationException("OPENAI_FT_MODEL environment variable is required");
 
 // === Register Core Services ===
 builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.DummyCapabilityProvider>();

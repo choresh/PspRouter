@@ -18,9 +18,8 @@ public class TrainingService : ITrainingService
         _logger = logger;
         _trainingDataProvider = trainingDataProvider;
         
-        // Get API key from environment
-        _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? 
-                  throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
+        // Get .env file variables
+        _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
         
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);

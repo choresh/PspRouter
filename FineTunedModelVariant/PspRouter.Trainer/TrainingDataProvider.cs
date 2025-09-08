@@ -14,7 +14,7 @@ public class TrainingDataProvider : ITrainingDataProvider
         _logger = logger;
 
         // Get .env file variables
-        var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION");
+        var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION") ?? throw new InvalidOperationException("PSPROUTER_DB_CONNECTION environment variable is required");
         
         // Ensure TrustServerCertificate=true is included to handle SSL certificate issues
         if (!string.IsNullOrEmpty(baseConnectionString))

@@ -44,8 +44,8 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Get .env file variables
-var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-var pgConn = Environment.GetEnvironmentVariable("PGVECTOR_CONNSTR"); // "Host=localhost;Username=postgres;Password=postgres;Database=psp_router";
+var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
+var pgConn = Environment.GetEnvironmentVariable("PGVECTOR_CONNSTR") ?? throw new InvalidOperationException("PGVECTOR_CONNSTR environment variable is required"); // "Host=localhost;Username=postgres;Password=postgres;Database=psp_router";
 
 // === Register Core Services ===
 builder.Services.AddSingleton<IHealthProvider, PspRouter.API.DummyHealthProvider>();

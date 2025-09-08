@@ -78,8 +78,8 @@ public class Program
             })
             .ConfigureServices((context, services) =>
             {
-                // Get .env file variables
-                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                // Get .env file variable
+                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
 
                 // Register OpenAI client               
                 services.AddSingleton<OpenAIClient>(provider => new OpenAIClient(apiKey));
