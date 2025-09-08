@@ -2,37 +2,102 @@
 using Microsoft.Extensions.Configuration;
 using OpenAI;
 using PspRouter.Lib;
+using System.Text;
+using System.Text.Json;
 
 namespace PspRouter.Trainer;
 
 // Training service implementation
 public class TrainingService : ITrainingService
 {
-    private readonly OpenAIClient _openAiClient;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<TrainingService> _logger;
     private readonly IConfiguration _configuration;
     private readonly ITrainingDataProvider _trainingDataProvider;
+    private readonly string _apiKey;
 
     public TrainingService(OpenAIClient openAiClient, ILogger<TrainingService> logger, IConfiguration configuration, ITrainingDataProvider trainingDataProvider)
     {
-        _openAiClient = openAiClient;
+        _httpClient = new HttpClient();
         _logger = logger;
         _configuration = configuration;
         _trainingDataProvider = trainingDataProvider;
+        
+        // Get API key from environment
+        _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? 
+                  throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
+        
+        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
     }
 
     public async Task<string> CreateFineTunedModelAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating fine-tuned model...");
         
-        // TODO: Implement fine-tuned model creation logic
+        try
+        {
         // 1. Upload training data
+            _logger.LogInformation("Step 1: Uploading training data...");
+            var fileId = await UploadTrainingDataAsync(cancellationToken);
+            
         // 2. Create fine-tuning job
-        // 3. Monitor job status
-        // 4. Return model ID when complete
+            _logger.LogInformation("Step 2: Creating fine-tuning job...");
+            var jobId = await CreateFineTuningJobAsync(fileId, cancellationToken);
+            
+            // 3. Monitor job status until completion
+            _logger.LogInformation("Step 3: Monitoring fine-tuning job status...");
+            var modelId = await MonitorFineTuningJobAsync(jobId, cancellationToken);
+            
+            _logger.LogInformation("Fine-tuned model created successfully: {ModelId}", modelId);
+            return modelId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating fine-tuned model");
+            throw;
+        }
+    }
+    
+    private async Task<string> MonitorFineTuningJobAsync(string jobId, CancellationToken cancellationToken = default)
+    {
+        var maxWaitTime = TimeSpan.FromHours(2); // Maximum wait time
+        var checkInterval = TimeSpan.FromMinutes(1); // Check every minute
+        var startTime = DateTime.UtcNow;
         
-        await Task.Delay(1000, cancellationToken); // Placeholder
-        return "ft-model-placeholder";
+        while (DateTime.UtcNow - startTime < maxWaitTime)
+        {
+            var status = await GetFineTuningJobStatusAsync(jobId, cancellationToken);
+            
+            switch (status.ToLower())
+            {
+                case "succeeded":
+                    // Get the fine-tuned model ID
+                    var fineTuningJob = await GetFineTuningJobDetailsAsync(jobId, cancellationToken);
+                    if (fineTuningJob.FineTunedModel != null)
+                    {
+                        return fineTuningJob.FineTunedModel;
+                    }
+                    throw new InvalidOperationException("Fine-tuning job succeeded but no model ID was returned");
+                
+                case "failed":
+                case "cancelled":
+                    throw new InvalidOperationException($"Fine-tuning job {jobId} {status}");
+                
+                case "validating_files":
+                case "queued":
+                case "running":
+                    _logger.LogInformation("Fine-tuning job {JobId} is {Status}. Waiting...", jobId, status);
+                    await Task.Delay(checkInterval, cancellationToken);
+                    break;
+                
+                default:
+                    _logger.LogWarning("Unknown fine-tuning job status: {Status}", status);
+                    await Task.Delay(checkInterval, cancellationToken);
+                    break;
+            }
+        }
+        
+        throw new TimeoutException($"Fine-tuning job {jobId} did not complete within {maxWaitTime}");
     }
 
     public async Task<string> UploadTrainingDataAsync(CancellationToken cancellationToken = default)
@@ -49,22 +114,29 @@ public class TrainingService : ITrainingService
             // Convert training data to JSONL format for OpenAI
             var jsonlContent = ConvertTrainingDataToJsonl(trainingData);
             
-            // TODO: Implement actual OpenAI Files API upload
-            // For now, we'll create a temporary file and upload it
+            // Create a temporary file for upload
             var tempFilePath = Path.GetTempFileName();
             await File.WriteAllTextAsync(tempFilePath, jsonlContent, cancellationToken);
             
             _logger.LogInformation("Created temporary training file: {TempFilePath}", tempFilePath);
             
-            // TODO: Upload to OpenAI Files API
-            // var fileResponse = await _openAiClient.Files.UploadFileAsync(
-            //     new FileUploadRequest(tempFilePath, "fine-tune", OpenAIFilePurpose.FineTune));
-            
-            // Clean up temp file
-            File.Delete(tempFilePath);
-            
-            await Task.Delay(1000, cancellationToken); // Placeholder
-            return "file-placeholder-id";
+            try
+            {
+                // Upload to OpenAI Files API using HTTP
+                var fileId = await UploadFileToOpenAIAsync(tempFilePath, cancellationToken);
+                
+                _logger.LogInformation("Successfully uploaded training file to OpenAI. File ID: {FileId}", fileId);
+                
+                return fileId;
+            }
+            finally
+            {
+                // Clean up temp file
+                if (File.Exists(tempFilePath))
+                {
+                    File.Delete(tempFilePath);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -77,22 +149,51 @@ public class TrainingService : ITrainingService
     {
         _logger.LogInformation("Creating fine-tuning job for file {FileId}", fileId);
         
-        // TODO: Implement fine-tuning job creation
-        // Use OpenAI FineTuning API to create job
-        
-        await Task.Delay(1000, cancellationToken); // Placeholder
-        return "job-placeholder-id";
+        try
+        {
+            // Create fine-tuning job using HTTP API
+            var jobId = await CreateFineTuningJobViaHttpAsync(fileId, cancellationToken);
+            
+            _logger.LogInformation("Successfully created fine-tuning job. Job ID: {JobId}", jobId);
+            
+            return jobId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating fine-tuning job for file {FileId}", fileId);
+            throw;
+        }
     }
 
     public async Task<string> GetFineTuningJobStatusAsync(string jobId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Getting status for fine-tuning job {JobId}", jobId);
         
-        // TODO: Implement job status checking
-        // Use OpenAI FineTuning API to get job status
-        
-        await Task.Delay(1000, cancellationToken); // Placeholder
-        return "completed";
+        try
+        {
+            // Get fine-tuning job status from HTTP API
+            var jobDetails = await GetFineTuningJobDetailsAsync(jobId, cancellationToken);
+            
+            _logger.LogInformation("Fine-tuning job {JobId} status: {Status}", jobId, jobDetails.Status);
+            
+            // Log additional details if available
+            if (jobDetails.FineTunedModel != null)
+            {
+                _logger.LogInformation("Fine-tuned model: {ModelId}", jobDetails.FineTunedModel);
+            }
+            
+            if (jobDetails.Error != null)
+            {
+                _logger.LogError("Fine-tuning job {JobId} failed with error: {Error}", jobId, jobDetails.Error.Message);
+            }
+            
+            return jobDetails.Status ?? "unknown";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting status for fine-tuning job {JobId}", jobId);
+            throw;
+        }
     }
 
     private string ConvertTrainingDataToJsonl(IEnumerable<TrainingData> trainingData)
@@ -165,5 +266,76 @@ public class TrainingService : ITrainingService
         }
         
         return string.Join("\n", jsonlLines);
+    }
+    
+    // HTTP-based OpenAI API implementations
+    private async Task<string> UploadFileToOpenAIAsync(string filePath, CancellationToken cancellationToken)
+    {
+        using var formData = new MultipartFormDataContent();
+        using var fileContent = new ByteArrayContent(await File.ReadAllBytesAsync(filePath, cancellationToken));
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        
+        formData.Add(fileContent, "file", "training_data.jsonl");
+        formData.Add(new StringContent("fine-tune"), "purpose");
+        
+        var response = await _httpClient.PostAsync("https://api.openai.com/v1/files", formData, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var fileResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+        
+        return fileResponse.GetProperty("id").GetString() ?? throw new InvalidOperationException("File ID not returned from OpenAI API");
+    }
+    
+    private async Task<string> CreateFineTuningJobViaHttpAsync(string fileId, CancellationToken cancellationToken)
+    {
+        var requestBody = new
+        {
+            training_file = fileId,
+            model = "gpt-3.5-turbo",
+            suffix = "psp-router"
+        };
+        
+        var json = JsonSerializer.Serialize(requestBody);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        
+        var response = await _httpClient.PostAsync("https://api.openai.com/v1/fine_tuning/jobs", content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var jobResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+        
+        return jobResponse.GetProperty("id").GetString() ?? throw new InvalidOperationException("Job ID not returned from OpenAI API");
+    }
+    
+    private async Task<FineTuningJobDetails> GetFineTuningJobDetailsAsync(string jobId, CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.GetAsync($"https://api.openai.com/v1/fine_tuning/jobs/{jobId}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+        
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var jobResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+        
+        return new FineTuningJobDetails
+        {
+            Id = jobResponse.GetProperty("id").GetString(),
+            Status = jobResponse.GetProperty("status").GetString(),
+            FineTunedModel = jobResponse.TryGetProperty("fine_tuned_model", out var model) ? model.GetString() : null,
+            Error = jobResponse.TryGetProperty("error", out var error) ? new FineTuningError { Message = error.GetProperty("message").GetString() } : null
+        };
+    }
+    
+    // Helper classes for API responses
+    private class FineTuningJobDetails
+    {
+        public string? Id { get; set; }
+        public string? Status { get; set; }
+        public string? FineTunedModel { get; set; }
+        public FineTuningError? Error { get; set; }
+    }
+    
+    private class FineTuningError
+    {
+        public string? Message { get; set; }
     }
 }
