@@ -1,4 +1,4 @@
-# 🚀 PSP Router - Implementation TODO List
+# 🚀 PSP Router - Implementation TODO List (RAG-based variant)
 
 ## 📋 Overview
 This document outlines all the components that need to be implemented or replaced to complete the PSP Router solution. The system is currently functional with dummy implementations and needs real data integrations for production use.

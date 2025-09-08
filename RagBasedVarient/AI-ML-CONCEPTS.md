@@ -1,4 +1,4 @@
-# 📚 AI/ML Concepts Explained for Programmers
+# 📚 AI/ML Concepts Explained for Programmers (RAG-based variant)
 
 ## **A.0 Overview**
 This document explains the key AI/ML concepts used in the PSP Router in programmer-friendly terms. No advanced mathematics required - just practical understanding of how these concepts work in our payment routing system.

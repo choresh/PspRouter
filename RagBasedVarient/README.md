@@ -1,4 +1,4 @@
-# 🚀 PSP Router - Intelligent Payment Routing System
+# 🚀 PSP Router - Intelligent Payment Routing System (RAG-based variant)
 
 ## 🎯 Purpose
 Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using **LLM-based decision making**, **multi-armed bandit learning**, and **vector memory**.
