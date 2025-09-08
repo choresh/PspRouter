@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using OpenAI;
 using PspRouter.Lib;
 using System.Text;
 using System.Text.Json;
@@ -14,7 +13,7 @@ public class TrainingService : ITrainingService
     private readonly ITrainingDataProvider _trainingDataProvider;
     private readonly string _apiKey;
 
-    public TrainingService(OpenAIClient openAiClient, ILogger<TrainingService> logger, ITrainingDataProvider trainingDataProvider)
+    public TrainingService(ILogger<TrainingService> logger, ITrainingDataProvider trainingDataProvider)
     {
         _logger = logger;
         _trainingDataProvider = trainingDataProvider;
