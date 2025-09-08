@@ -620,6 +620,39 @@ Transaction Request
     [Final Decision]
 ```
 
+### **LLM Routing Algorithm (Step-by-step)**
+
+1. **Inputs prepared**
+   - Valid PSP candidates after guardrails (capabilities, health, SCA) are applied
+   - Transaction context, merchant preferences, segment/bandit stats, and vector-memory lessons
+
+2. **Context built for the LLM**
+   - Serialize a structured object with: `Transaction`, `Candidates`, `MerchantPreferences`, `SegmentStats`, `RelevantLessons`
+
+3. **Prompting**
+   - Construct a strict system prompt with rules and response schema
+   - Provide a short user instruction: “Route this payment…”
+
+4. **Inference**
+   - Call the chat model to produce a JSON decision; tools may be available for health/fee lookups
+
+5. **Validation**
+   - Parse JSON to a `RouteDecision`
+   - Ensure the chosen `Candidate` is one of the valid PSPs
+
+6. **Return or Fallback**
+   - If valid → return the decision
+   - If missing/invalid → return null, triggering deterministic/bandit fallback in the caller
+
+7. **Output**
+   - A structured `RouteDecision` with `Candidate`, `Alternates`, `Reasoning`, `Guardrail`, `Constraints`, and `Features_Used`
+
+#### Code entry points
+- `PspRouter.DecideAsync(...)` orchestrates LLM-first with fallback
+- `PspRouter.DecideWithLLMAsync(...)` builds context, prompts, calls the model, validates
+- `PspRouter.GetRelevantLessonsAsync(...)` integrates vector memory (stubbed pending embeddings)
+- `PspRouter.BuildSystemPrompt()` defines the strict schema and rules
+
 ### **What the LLM Receives**
 
 The LLM gets comprehensive context for each decision:
