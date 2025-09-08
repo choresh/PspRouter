@@ -1,4 +1,4 @@
-# 🚀 PSP Router - Implementation TODO List
+# 🚀 PSP Router - Implementation TODO List (Pre-Trained LLM Variant)
 
 ## 📋 Overview
 This document outlines all the components that need to be implemented or replaced to complete the PSP Router solution. The system is currently functional with dummy implementations and needs real data integrations for production use.
@@ -8,324 +8,47 @@ This document outlines all the components that need to be implemented or replace
 ## 📅 **Implementation Timeline & Next Stages**
 
 ### **📋 Implementation Priority Order**
-1. **🚨 CRITICAL FIRST**: Bandit Statistics Persistence & Recovery (Item #1) - Production blocker
-2. **Phase 1 Core**: Environment Configuration (Item #2) → Database Setup (Item #3) → Vector Memory Integration (Item #4)
-3. **Phase 2 Integration**: Health Provider (Item #5) → Fee Provider (Item #6) → Service Registration (Item #7)
-4. **Phase 3 Real Data**: Historical Statistics (Item #8) → Merchant Preferences (Item #9) → Transaction Segmentation (Item #10)
-5. **Phase 4 Production**: Monitoring (Item #11) → Caching (Item #12) → Rate Limiting (Item #13) → Security (Item #14)
-6. **Phase 5 Testing**: Integration Tests (Item #15) → Performance Testing (Item #16) → Data Quality Tests (Item #17)
-7. **Phase 6 Deployment**: Containerization (Item #18) → CI/CD Pipeline (Item #19) → Configuration Management (Item #20)
-8. **Phase 7 Advanced**: ML Enhancements (Item #21) → Analytics (Item #22) → Multi-Region (Item #23)
+1. Core wiring: environment, DI, prompt/schema, timeouts/fallback
+2. Replace dummies: Health Provider, Fee Provider
+3. Inputs & guardrails: capability matrix, PSP snapshots, preferences
+4. Observability: logging, metrics, tracing; robust error handling
+5. Testing: integration and performance (latency + fallback)
+6. Deployment: containerization, CI/CD, config management
+7. Hardening: security, rate limiting, caching
 
 ### **⚠️ Critical Dependencies**
-- **🚨 Item #1 (Bandit Persistence) MUST be implemented FIRST** - it's blocking production use
-- **Database Setup** must be complete before bandit persistence and historical statistics
-- **Environment Configuration** must be done before any real integrations
-- **Vector Memory Integration** can be done in parallel with bandit persistence
-- **Historical Statistics** (Item #8) depends on Database Setup and transaction_outcomes table
-- **Health/Fee Providers** must be implemented before real PSP integrations
-- **Service Registration** must be updated after implementing new providers
-- **Monitoring** should be implemented before production deployment
+- Environment configuration before real integrations
+- Health/Fee providers before production testing
+- Observability before production rollout
 
 ### **🔄 Sequential vs Parallel Tasks**
-**Sequential (Must be done in order):**
-- Item #1 → Items #2 & #3 → Item #4 (Core foundation)
-- Items #5 & #6 → Item #7 (Provider implementations)
-- Item #8 → Items #9 & #10 (Real data integration)
+**Sequential:** Core wiring → Providers → Observability → Testing → Deployment
 
-**Parallel (Can be done simultaneously in any order):**
-- Items #2 & #3: Environment + Database setup
-- Items #5 & #6: Health + Fee providers
-- Items #9 & #10: Merchant preferences + Transaction segmentation
-- Items #11-14: All production features (Monitoring, Caching, Rate Limiting, Security)
-- Items #15-17: All testing features (Integration, Performance, Data Quality tests)
-- Items #18-20: All deployment features (Containerization, CI/CD, Configuration)
-- Items #21-23: All advanced features (ML, Analytics, Multi-Region)
+**Parallel:** Health + Fee providers; Monitoring/Rate limiting/Caching once endpoints stable
 
 ### **🎯 Success Criteria**
-- **Week 2**: System can restart without losing learning progress (Bandit Persistence)
-- **Week 3**: All core functionality working with real data (Phases 1-2 complete)
-- **Week 4**: Real statistics and merchant preferences working (Phase 3 complete)
-- **Week 6**: Real PSP integrations working reliably (Phase 4 production features)
-- **Week 8**: Production-ready with monitoring, security, and testing (Phases 5-6 complete)
-- **Week 12**: Enterprise-grade system with advanced features (Phase 7 complete)
+- P95 latency within SLA with deterministic fallback
+- Schema-valid decisions with clear reasoning
+- Production-grade logs/metrics/traces
 
 ---
 
-## 🚨 **CRITICAL - Phase 1: Core Functionality**
+## 🚀 **Phase 1: Core Functionality**
 
-### 1. **Bandit Statistics Persistence & Recovery** ❌ **MISSING** 🚨 **CRITICAL FIRST**
-**Files:** `PspRouter.Lib/Bandit.cs`, `PspRouter.API/Controllers/RoutingController.cs`
 
-**Current Issue:** Bandit statistics are lost on server restart - no persistence or recovery
-
-**Critical Problems:**
-- ❌ Transaction outcomes are only logged, not stored in database
-- ❌ Bandit statistics exist only in memory
-- ❌ No recovery mechanism on application startup
-- ❌ Server restart = complete loss of learning progress
-
-**Implementation Required:**
-
-#### **A. Transaction Outcome Storage**
-```csharp
-// File: PspRouter.API/Controllers/RoutingController.cs
-[HttpPost("outcome")]
-public async Task<ActionResult> UpdateOutcome([FromBody] TransactionOutcome outcome)
-{
-    try
-    {
-        // TODO: Store in database instead of just logging
-        // await _transactionOutcomeService.StoreAsync(outcome);
-        
-        // TODO: Update bandit learning
-        // await _router.UpdateRewardAsync(decision, outcome);
-        
-        _logger.LogInformation("Transaction outcome: {Outcome}", JsonSerializer.Serialize(outcome));
-        return Ok(new { message = "Outcome recorded successfully" });
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error updating transaction outcome");
-        return StatusCode(500, new { error = "Internal server error", message = ex.Message });
-    }
-}
-```
-
-#### **B. Bandit Statistics Persistence**
-```csharp
-// File: PspRouter.Lib/Bandit.cs
-public interface IBanditPersistence
-{
-    Task SaveStatisticsAsync(Dictionary<string, Dictionary<string, (double sum, int count)>> stats);
-    Task<Dictionary<string, Dictionary<string, (double sum, int count)>>> LoadStatisticsAsync();
-    Task RebuildFromTransactionHistoryAsync();
-}
-
-public class DatabaseBanditPersistence : IBanditPersistence
-{
-    private readonly IDatabaseContext _db;
-    private readonly ILogger<DatabaseBanditPersistence> _logger;
-
-    public DatabaseBanditPersistence(IDatabaseContext db, ILogger<DatabaseBanditPersistence> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
-
-    public async Task SaveStatisticsAsync(Dictionary<string, Dictionary<string, (double sum, int count)>> stats)
-    {
-        // TODO: Implement using entity classes
-        // foreach (var segment in stats)
-        // {
-        //     foreach (var arm in segment.Value)
-        //     {
-        //         var banditStat = new BanditStat
-        //         {
-        //             SegmentKey = segment.Key,
-        //             ArmName = arm.Key,
-        //             SumRewards = arm.Value.sum,
-        //             CountPulls = arm.Value.count
-        //         };
-        //         await _db.ExecuteAsync(sql, banditStat);
-        //     }
-        // }
-    }
-
-    public async Task<Dictionary<string, Dictionary<string, (double sum, int count)>>> LoadStatisticsAsync()
-    {
-        // TODO: Implement using entity classes
-        // var stats = await _db.QueryAsync<BanditStat>("SELECT * FROM bandit_stats");
-        // return ConvertToDictionary(stats);
-    }
-
-    public async Task RebuildFromTransactionHistoryAsync()
-    {
-        // TODO: Implement using entity classes
-        // var outcomes = await _db.QueryAsync<TransactionOutcome>(
-        //     "SELECT * FROM transaction_outcomes ORDER BY processed_at");
-        // Rebuild bandit statistics from outcomes
-    }
-}
-```
-
-#### **C. Application Startup Recovery**
-```csharp
-// File: PspRouter.API/Program.cs
-public async Task StartAsync()
-{
-    // TODO: Rebuild bandit statistics from database
-    // await _banditPersistence.RebuildFromTransactionHistoryAsync();
-    
-    _logger.LogInformation("Bandit statistics rebuilt from transaction history");
-}
-```
-
-**Database Schema (Already Exists):**
-```sql
--- ✅ Tables already created in setup-database.sql
-CREATE TABLE IF NOT EXISTS bandit_stats (
-    segment_key TEXT NOT NULL,
-    arm_name TEXT NOT NULL,
-    alpha REAL DEFAULT 1.0,
-    beta REAL DEFAULT 1.0,
-    sum_rewards REAL DEFAULT 0.0,
-    count_pulls INTEGER DEFAULT 0,
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (segment_key, arm_name)
-);
-
-CREATE TABLE IF NOT EXISTS transaction_outcomes (
-    decision_id TEXT PRIMARY KEY,
-    psp_name TEXT NOT NULL,
-    authorized BOOLEAN NOT NULL,
-    transaction_amount DECIMAL(10,2) NOT NULL,
-    fee_amount DECIMAL(10,2) NOT NULL,
-    processing_time_ms INTEGER NOT NULL,
-    risk_score INTEGER NOT NULL,
-    processed_at TIMESTAMP NOT NULL,
-    error_code TEXT,
-    error_message TEXT,
-    merchant_id TEXT,
-    currency TEXT,
-    payment_method TEXT
-);
-```
-
-### 2. **Environment Configuration** ⚠️ **REQUIRED**
+### 1. **Environment Configuration** ⚠️ **REQUIRED**
 - [ ] Set up environment variables:
   ```bash
   OPENAI_API_KEY=sk-your-openai-key-here
-  PGVECTOR_CONNSTR=Host=localhost;Username=postgres;Password=postgres;Database=psp_router
   ```
 - [ ] Create `.env` file or configure in your deployment environment
 - [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
-
-### 3. **Database Setup** ⚠️ **REQUIRED**
-- [ ] Install PostgreSQL with pgvector extension
-- [ ] Run `setup-database.sql` to create database schema
-- [ ] Verify database connection in `Program.cs`
-- [ ] Test vector operations with sample data
-
-#### **A. Entity Classes (POCOs)**
-**File:** `PspRouter.Lib/Entities.cs` (new file)
-
-**Implementation Required:**
-```csharp
-namespace PspRouter.Lib.Entities;
-
-public class PspLesson
-{
-    public string Key { get; set; } = string.Empty;
-    public string Content { get; set; } = string.Empty;
-    public Dictionary<string, string> Meta { get; set; } = new();
-    public float[]? Embedding { get; set; }
-}
-
-public class BanditStat
-{
-    public string SegmentKey { get; set; } = string.Empty;
-    public string ArmName { get; set; } = string.Empty;
-    public double Alpha { get; set; } = 1.0;
-    public double Beta { get; set; } = 1.0;
-    public double SumRewards { get; set; } = 0.0;
-    public int CountPulls { get; set; } = 0;
-    public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
-}
-
-public class TransactionOutcome
-{
-    public string DecisionId { get; set; } = string.Empty;
-    public string PspName { get; set; } = string.Empty;
-    public bool Authorized { get; set; }
-    public decimal TransactionAmount { get; set; }
-    public decimal FeeAmount { get; set; }
-    public int ProcessingTimeMs { get; set; }
-    public int RiskScore { get; set; }
-    public DateTime ProcessedAt { get; set; }
-    public string? ErrorCode { get; set; }
-    public string? ErrorMessage { get; set; }
-    public string? MerchantId { get; set; }
-    public string? Currency { get; set; }
-    public string? PaymentMethod { get; set; }
-}
-```
-
-#### **B. Database Access Layer**
-**File:** `PspRouter.Lib/DatabaseContext.cs` (new file)
-
-**Implementation Required:**
-```csharp
-public interface IDatabaseContext
-{
-    Task<T?> QuerySingleAsync<T>(string sql, object? parameters = null, CancellationToken ct = default);
-    Task<IEnumerable<T>> QueryAsync<T>(string sql, object? parameters = null, CancellationToken ct = default);
-    Task<int> ExecuteAsync(string sql, object? parameters = null, CancellationToken ct = default);
-    Task<T> ExecuteScalarAsync<T>(string sql, object? parameters = null, CancellationToken ct = default);
-}
-
-public class NpgsqlDatabaseContext : IDatabaseContext
-{
-    private readonly string _connectionString;
-    private readonly ILogger<NpgsqlDatabaseContext> _logger;
-
-    public NpgsqlDatabaseContext(string connectionString, ILogger<NpgsqlDatabaseContext> logger)
-    {
-        _connectionString = connectionString;
-        _logger = logger;
-    }
-
-    // TODO: Implement with proper connection management,
-    // parameterization, error handling, and logging
-}
-```
-
-### 4. **Vector Memory Integration** ⚠️ **INCOMPLETE**
-**File:** `PspRouter.Lib/Router.cs` (lines 102-128)
-
-**Current Issue:** `GetRelevantLessonsAsync` method returns empty list
-
-**Important Clarifications:**
-- **Vector DB is FOR the LLM**: Used exclusively to enhance LLM decision-making
-- **NOT a Fallback**: The deterministic fallback system does not use vector memory
-- **Memory vs. Logic**: Vector DB provides historical context, not routing logic
-
-**Implementation Required:**
-```csharp
-private async Task<List<string>> GetRelevantLessonsAsync(RouteContext ctx, CancellationToken ct)
-{
-    if (_memory == null) return new List<string>();
-
-    try
-    {
-        // TODO: Implement embedding integration
-        // 1. Create query embedding using OpenAIEmbeddings
-        // 2. Search vector memory with embedding
-        // 3. Return top-k relevant lessons
-        
-        var query = $"PSP routing for {ctx.Tx.Currency} {ctx.Tx.Method} {ctx.Tx.Scheme} merchant {ctx.Tx.MerchantCountry}";
-        
-        // IMPLEMENTATION NEEDED:
-        // var embeddings = _embeddingsService; // Get from DI
-        // var queryEmbedding = await embeddings.CreateEmbeddingAsync(query, ct);
-        // var results = await _memory.SearchAsync(queryEmbedding, k: 5, ct);
-        // return results.Select(r => r.text).ToList();
-        
-        return new List<string>();
-    }
-    catch (Exception ex)
-    {
-        _logger?.LogError(ex, "Failed to retrieve relevant lessons from memory");
-        return new List<string>();
-    }
-}
-```
 
 ---
 
 ## 🔧 **Phase 2: Replace Dummy Implementations**
 
-### 5. **Health Provider Implementation** ❌ **DUMMY**
+### 2. **Health Provider Implementation** ❌ **DUMMY**
 **File:** `PspRouter.API/Dummies.cs` (lines 5-11)
 
 **Current:** Returns hardcoded "green" health status
@@ -355,7 +78,7 @@ public class RealHealthProvider : IHealthProvider
 }
 ```
 
-### 6. **Fee Provider Implementation** ❌ **DUMMY**
+### 3. **Fee Provider Implementation** ❌ **DUMMY**
 **File:** `PspRouter.API/Dummies.cs` (lines 13-19)
 
 **Current:** Returns hardcoded 200 bps + $0.30 fees
@@ -386,7 +109,7 @@ public class RealFeeProvider : IFeeQuoteProvider
 }
 ```
 
-### 7. **Update Service Registration** ⚠️ **REQUIRED**
+### 4. **Update Service Registration** ⚠️ **REQUIRED**
 **File:** `PspRouter.API/Program.cs` (lines 53-54)
 
 **Replace:**
@@ -404,154 +127,7 @@ builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>(
 
 ## 📊 **Phase 3: Real Data Integration**
 
-### 8. **Historical Statistics Implementation** ❌ **HARDCODED**
-**Current Issue:** `AuthRate30d` values are hardcoded in test data
-
-#### **🔍 What Currently Exists:**
-
-**A. Hardcoded Values in Tests:**
-```csharp
-// File: PspRouter.Tests/IntegrationTests.cs (lines 119-125)
-var baseRate = psp switch
-{
-    "Adyen" => 0.89,    // ← HARDCODED: 89% auth rate
-    "Stripe" => 0.87,   // ← HARDCODED: 87% auth rate  
-    "Klarna" => 0.85,   // ← HARDCODED: 85% auth rate
-    _ => 0.80           // ← HARDCODED: 80% default
-};
-```
-
-**B. Usage in Router Logic:**
-```csharp
-// File: PspRouter.Lib/Router.cs (line 187)
-// Deterministic fallback scoring uses AuthRate30d
-var best = candidates.OrderByDescending(c =>
-    c.AuthRate30d - (c.FeeBps/10000.0) - (double)(c.FixedFee/Math.Max(tx.Amount,1m))
-).First();
-
-// File: PspRouter.Lib/Router.cs (lines 200, 207)
-// Decision reasoning includes AuthRate30d
-Reasoning: $"{method} - Auth: {chosen.AuthRate30d:P2}, Fee: {chosen.FeeBps}bps + {chosen.FixedFee:C}",
-Features_Used: new[] { 
-    $"auth={chosen.AuthRate30d:F2}",  // ← Used in decision features
-    $"fee_bps={chosen.FeeBps}",
-    // ...
-}
-```
-
-**C. LLM Context Integration:**
-```csharp
-// File: PspRouter.Lib/Router.cs (lines 73-79)
-// AuthRate30d is passed to LLM in context
-var contextJson = JsonSerializer.Serialize(new {
-    Transaction = ctx.Tx,
-    Candidates = validCandidates,  // ← Contains AuthRate30d values
-    MerchantPreferences = ctx.MerchantPrefs,
-    SegmentStats = ctx.SegmentStats,
-    RelevantLessons = relevantLessons
-});
-```
-
-#### **🎯 What This Means:**
-- **Current State**: System uses static, unrealistic auth rates (89%, 87%, 85%)
-- **Impact**: Routing decisions are based on fake data, not real PSP performance
-- **Problem**: No learning from actual transaction outcomes
-- **Critical**: Both LLM and deterministic fallback depend on accurate `AuthRate30d`
-
-#### **📍 Where New Code Should Be Used:**
-
-**A. Replace Test Data Generation:**
-```csharp
-// File: PspRouter.Tests/IntegrationTests.cs (line 86)
-// REPLACE THIS:
-candidates.Add(new("Adyen", true, healthStatus, GetRealisticAuthRate(tx, "Adyen"), latency, GetRealisticFeeBps(tx, "Adyen"), true, true));
-
-// WITH THIS:
-var authRates = await _statisticsProvider.GetAuthRates30dAsync(new[] { "Adyen" }, ct);
-candidates.Add(new("Adyen", true, healthStatus, authRates["Adyen"], latency, GetRealisticFeeBps(tx, "Adyen"), true, true));
-```
-
-**B. API Controller Integration:**
-```csharp
-// File: PspRouter.API/Controllers/RoutingController.cs (lines 35-40)
-// ADD BEFORE creating RouteContext:
-var authRates = await _statisticsProvider.GetAuthRates30dAsync(
-    request.Candidates.Select(c => c.Name), 
-    CancellationToken.None);
-
-// UPDATE candidates with real auth rates:
-foreach (var candidate in request.Candidates)
-{
-    if (authRates.ContainsKey(candidate.Name))
-    {
-        // Update AuthRate30d with real data
-        candidate = candidate with { AuthRate30d = authRates[candidate.Name] };
-    }
-}
-```
-
-**C. Service Registration:**
-```csharp
-// File: PspRouter.API/Program.cs (line 54)
-// ADD after existing service registrations:
-builder.Services.AddSingleton<IStatisticsProvider, StatisticsProvider>();
-```
-
-#### **🛠 Implementation Required:**
-```csharp
-public interface IStatisticsProvider
-{
-    Task<Dictionary<string, double>> GetAuthRates30dAsync(
-        IEnumerable<string> psps, 
-        CancellationToken ct);
-}
-
-public class StatisticsProvider : IStatisticsProvider
-{
-    private readonly IDatabaseContext _db;
-    private readonly ILogger<StatisticsProvider> _logger;
-
-    public StatisticsProvider(IDatabaseContext db, ILogger<StatisticsProvider> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
-
-    public async Task<Dictionary<string, double>> GetAuthRates30dAsync(
-        IEnumerable<string> psps, 
-        CancellationToken ct)
-    {
-        // TODO: Implement real statistics calculation using entity classes
-        // - Query transaction_outcomes table for last 30 days
-        // - Calculate authorization rates per PSP
-        // - Return dictionary of PSP -> AuthRate
-        
-        var stats = new Dictionary<string, double>();
-        foreach (var psp in psps)
-        {
-            var authRate = await CalculateAuthRateAsync(psp, DateTime.UtcNow.AddDays(-30), ct);
-            stats[psp] = authRate;
-        }
-        return stats;
-    }
-    
-    private async Task<double> CalculateAuthRateAsync(string psp, DateTime since, CancellationToken ct)
-    {
-        // TODO: SQL query to calculate auth rate using entity classes
-        // var outcomes = await _db.QueryAsync<TransactionOutcome>(
-        //     "SELECT * FROM transaction_outcomes WHERE psp_name = @psp AND processed_at >= @since",
-        //     new { psp, since }, ct);
-        // 
-        // var total = outcomes.Count();
-        // var authorized = outcomes.Count(o => o.Authorized);
-        // return total > 0 ? (double)authorized / total : 0.0;
-        
-        throw new NotImplementedException("Statistics provider not implemented");
-    }
-}
-```
-
-### 9. **Merchant Preferences System** ❌ **EMPTY**
+### 5. **Merchant Preferences System** ❌ **EMPTY**
 **Current Issue:** `MerchantPrefs` and `SegmentStats` are empty
 
 **Implementation Required:**
@@ -573,7 +149,7 @@ public class MerchantPreferencesProvider
 }
 ```
 
-### 10. **Transaction Segmentation** ❌ **MISSING**
+### 6. **Transaction Segmentation** ❌ **MISSING**
 **Implementation Required:**
 ```csharp
 public class SegmentAnalytics
@@ -595,26 +171,26 @@ public class SegmentAnalytics
 
 ## 🏗️ **Phase 4: Production Features**
 
-### 11. **Monitoring & Observability** ❌ **BASIC**
+### 8. **Monitoring & Observability** ❌ **BASIC**
 - [ ] Add structured logging with correlation IDs
 - [ ] Implement health check endpoints for all PSPs
 - [ ] Add metrics collection (authorization rates, response times)
 - [ ] Set up alerting for PSP failures
 - [ ] Add distributed tracing
 
-### 12. **Caching Layer** ❌ **MISSING**
+### 9. **Caching Layer** ❌ **MISSING**
 - [ ] Implement Redis caching for PSP health status
 - [ ] Cache fee calculations with TTL
 - [ ] Cache merchant preferences
 - [ ] Implement cache invalidation strategies
 
-### 13. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
+### 10. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
 - [ ] Add rate limiting for API endpoints
 - [ ] Implement circuit breakers for PSP calls
 - [ ] Add retry policies with exponential backoff
 - [ ] Implement bulkhead pattern for PSP isolation
 
-### 14. **Security Enhancements** ⚠️ **BASIC**
+### 11. **Security Enhancements** ⚠️ **BASIC**
 - [ ] Add API authentication/authorization
 - [ ] Implement request/response encryption
 - [ ] Add input validation and sanitization
@@ -624,46 +200,46 @@ public class SegmentAnalytics
 
 ## 🧪 **Phase 5: Testing & Quality**
 
-### 15. **Integration Tests** ⚠️ **PARTIAL**
+### 12. **Integration Tests** ⚠️ **PARTIAL**
 **File:** `PspRouter.Tests/IntegrationTests.cs`
 
 **Current:** Uses dummy implementations
 
 **Enhance with:**
 - [ ] Real PSP API integration tests (with test accounts)
-- [ ] Database integration tests
-- [ ] Vector memory integration tests
+ 
+ 
 - [ ] End-to-end routing flow tests
 
-### 16. **Performance Testing** ❌ **MISSING**
+### 13. **Performance Testing** ❌ **MISSING**
 - [ ] Load testing for routing decisions
 - [ ] Stress testing for concurrent requests
 - [ ] Memory usage profiling
-- [ ] Database performance optimization
+ 
 
-### 17. **Data Quality Tests** ❌ **MISSING**
+### 14. **Data Quality Tests** ❌ **MISSING**
 - [ ] PSP data validation tests
 - [ ] Fee calculation accuracy tests
 - [ ] Health status consistency tests
-- [ ] Vector search relevance tests
+ 
 
 ---
 
 ## 🔄 **Phase 6: Deployment & Operations**
 
-### 18. **Containerization** ❌ **MISSING**
+### 15. **Containerization** ❌ **MISSING**
 - [ ] Create Dockerfile for API
-- [ ] Create docker-compose.yml with PostgreSQL
+ 
 - [ ] Add health checks to containers
 - [ ] Configure multi-stage builds
 
-### 19. **CI/CD Pipeline** ❌ **MISSING**
+### 16. **CI/CD Pipeline** ❌ **MISSING**
 - [ ] Set up automated testing pipeline
 - [ ] Add code quality checks (SonarQube)
 - [ ] Implement automated deployment
 - [ ] Add rollback capabilities
 
-### 20. **Configuration Management** ⚠️ **BASIC**
+### 17. **Configuration Management** ⚠️ **BASIC**
 - [ ] Implement configuration validation
 - [ ] Add environment-specific configs
 - [ ] Implement feature flags
@@ -673,19 +249,19 @@ public class SegmentAnalytics
 
 ## 📈 **Phase 7: Advanced Features**
 
-### 21. **Machine Learning Enhancements** ❌ **BASIC**
+### 18. **Machine Learning Enhancements** ❌ **BASIC**
 - [ ] Implement A/B testing framework
 - [ ] Add model performance monitoring
 - [ ] Implement online learning for bandits
 - [ ] Add feature engineering pipeline
 
-### 22. **Analytics & Reporting** ❌ **MISSING**
+### 19. **Analytics & Reporting** ❌ **MISSING**
 - [ ] Implement routing decision analytics
 - [ ] Add PSP performance dashboards
 - [ ] Create merchant-specific reports
 - [ ] Implement cost optimization insights
 
-### 23. **Multi-Region Support** ❌ **MISSING**
+### 20. **Multi-Region Support** ❌ **MISSING**
 - [ ] Implement geographic routing
 - [ ] Add region-specific PSP preferences
 - [ ] Implement data residency compliance
@@ -723,7 +299,7 @@ public class SegmentAnalytics
 - [Klarna API](https://developers.klarna.com/api/)
 
 ### **Technical References:**
-- [pgvector Documentation](https://github.com/pgvector/pgvector)
+ 
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [ASP.NET Core Best Practices](https://docs.microsoft.com/en-us/aspnet/core/)
 
@@ -794,18 +370,12 @@ public class SegmentAnalytics
 
 #### **Library Dependencies**
 The library has minimal external dependencies:
-- `Npgsql` - PostgreSQL client
 - `OpenAI` - OpenAI API client  
-- `Pgvector` - Vector database support
 - `Microsoft.Extensions.Logging.Abstractions` - Logging interfaces
 
 ### **🔧 Customization & Extensions**
 
-#### **External Bandit Libraries**
-For production use, consider integrating with industry-standard libraries:
-- [ ] **VowpalWabbit** (requires .NET Framework compatibility)
-- [ ] **Accord.NET** (machine learning framework)
-- [ ] **ML.NET** (Microsoft's machine learning framework)
+ 
 
 #### **Adding New PSPs**
 - [ ] Update `CapabilityMatrix.Supports()` method
@@ -823,8 +393,7 @@ For production use, consider integrating with industry-standard libraries:
 #### **Caching Strategy**
 - [ ] **PSP Health**: Cache health status for 30 seconds
 - [ ] **Fee Tables**: Cache fee data for 5 minutes
-- [ ] **Memory Results**: Cache vector search results
-- [ ] **Bandit State**: In-memory bandit statistics
+ 
 
 #### **Database Optimization**
 - [ ] Optimize vector search performance with proper indexing
@@ -856,7 +425,7 @@ Error: 3D000: database "psp_router" does not exist
 ```
 Error: extension "vector" does not exist
 ```
-- [ ] Install pgvector extension: `sudo apt install postgresql-16-pgvector`
+ 
 
 **3. OpenAI API Key Invalid**
 ```

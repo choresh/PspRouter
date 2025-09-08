@@ -9,16 +9,13 @@ public class IntegrationTests
     [Fact]
     public async Task TestCompleteRoutingFlow()
     {
-        // This test demonstrates the complete PSP routing system
-        // with LLM-based intelligent routing, bandit learning, and vector memory
+        // This test demonstrates the complete PSP routing system (pre-trained model variant)
         
         // Arrange - Create mock services
         var healthProvider = new PspRouter.API.DummyHealthProvider();
         var feeProvider = new PspRouter.API.DummyFeeProvider();
         var chatClient = new PspRouter.API.DummyChatClient();
-        var memory = new MockVectorMemory();
         var logger = new MockLogger<PspRouter.Lib.PspRouter>();
-        var bandit = new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: new MockLogger<ContextualEpsilonGreedyBandit>());
         
         var tools = new List<IAgentTool>
         {
@@ -26,7 +23,7 @@ public class IntegrationTests
             new GetFeeQuoteTool(feeProvider, () => new RouteInput("", "", "", "", 0, PaymentMethod.Card))
         };
 
-        var router = new PspRouter.Lib.PspRouter(chatClient, healthProvider, feeProvider, tools, bandit, memory, logger);
+        var router = new PspRouter.Lib.PspRouter(chatClient, healthProvider, feeProvider, tools, logger);
 
         // Test multiple transactions to demonstrate learning
         var testTransactions = new[]
@@ -67,11 +64,8 @@ public class IntegrationTests
             // Simulate transaction outcome
             var outcome = SimulateRealisticOutcome(decision, tx);
             
-            // Update learning
-            router.UpdateReward(decision, outcome);
-            
-            // Verify learning update succeeded (no exceptions)
-            Assert.True(true); // If we get here, the update succeeded
+            // Pre-trained model variant: no online learning update
+            Assert.True(true);
         }
     }
 
@@ -158,13 +152,7 @@ public class IntegrationTests
 }
 
 // Mock implementations for testing
-public class MockVectorMemory : IVectorMemory
-{
-    public Task EnsureSchemaAsync(CancellationToken ct) => Task.CompletedTask;
-    public Task AddAsync(string key, string text, Dictionary<string, string> meta, float[] embedding, CancellationToken ct) => Task.CompletedTask;
-    public Task<IReadOnlyList<(string key, string text, Dictionary<string, string> meta, double score)>> SearchAsync(float[] query, int limit, CancellationToken ct) => 
-        Task.FromResult<IReadOnlyList<(string, string, Dictionary<string, string>, double)>>(new List<(string, string, Dictionary<string, string>, double)>());
-}
+// Vector memory mocks removed in pre-trained model variant
 
 public class MockLogger<T> : ILogger<T>
 {
