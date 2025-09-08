@@ -27,7 +27,7 @@ public class TrainingManager : BackgroundService
             _logger.LogInformation("Starting fine-tuning process...");
             
             // Step 1: Upload training data from database
-            var fileId = await _trainingService.UploadTrainingDataAsync(string.Empty, stoppingToken);
+            var fileId = await _trainingService.UploadTrainingDataAsync(stoppingToken);
             _logger.LogInformation("Training data uploaded with ID: {FileId}", fileId);
             
             // Step 2: Create fine-tuning job

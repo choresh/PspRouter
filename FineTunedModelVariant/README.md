@@ -301,88 +301,7 @@ The application uses ASP.NET Core Web API, providing:
 - **Command Line Integration**: Built-in support for command line arguments
 - **Deployment Flexibility**: Can be deployed as web app, service, or container
 
-
- 
-
-### 2. Environment Configuration
-
-```bash
-# Windows (PowerShell)
-$env:OPENAI_API_KEY="sk-your-openai-key"
-$env:OPENAI_FT_MODEL="ft:gpt-4.1:your-org:psp-router:v1"
-
-# Linux/Mac
-export OPENAI_API_KEY="sk-your-openai-key"
-export OPENAI_FT_MODEL="ft:gpt-4.1:your-org:psp-router:v1"
-```
-
-### 3. Configuration Management
-
-The application uses hierarchical configuration with the following precedence (highest to lowest):
-
-1. **Command Line Arguments**: `dotnet run -- --setting=value`
-2. **Environment Variables**: `OPENAI_API_KEY`, `OPENAI_FT_MODEL`
-3. **appsettings.{Environment}.json**: Environment-specific settings
-4. **appsettings.json**: Default configuration
-
-#### Configuration Files
-
-**`appsettings.json`** (default):
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft": "Warning"
-    }
-  },
-  "PspRouter": {
-    "OpenAI": {
-      "FineTunedModel": "ft:gpt-4.1:your-org:psp-router:v1"
-    }
-  }
-}
-```
-
-**`appsettings.Production.json`** (production overrides):
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Warning",
-      "PspRouter": "Information"
-    }
-  },
-  "PspRouter": {
-  }
-}
-```
-
-### 4. Service Registration & Lifetimes
-
-The application uses proper dependency injection with appropriate service lifetimes:
-
-```csharp
-// Singleton services (shared across the application)
-services.AddSingleton<ICapabilityProvider, DummyCapabilityProvider>();
-services.AddSingleton<IHealthProvider, DummyHealthProvider>();
-services.AddSingleton<IFeeQuoteProvider, DummyFeeProvider>();
-services.AddSingleton<IChatClient>(provider => new OpenAIChatClient(apiKey, model: Environment.GetEnvironmentVariable("OPENAI_FT_MODEL") ?? builder.Configuration["PspRouter:OpenAI:FineTunedModel"] ?? "gpt-4.1"));
-// Embeddings, vector memory, and bandit registrations removed in this variant
-
-// Scoped services (per request/operation)
-services.AddScoped<PspRouter.PspRouter>(provider => /* ... */);
-
-// Transient services (new instance each time)
-services.AddTransient<PspRouterDemo>();
-```
-
-**Service Lifetime Benefits:**
-- **Singleton**: Shared state, efficient resource usage (health providers, embeddings)
-- **Scoped**: Per-operation state, thread-safe (PSP router instances)
-- **Transient**: No shared state, always fresh (demo services)
-
-### 5. Build and Run the Application
+### 2. Build and Run the Application
 
 ```bash
 # Build all projects
@@ -626,16 +545,6 @@ reward = baseAuthReward - feePenalty + speedBonus - riskPenalty
 
 ## 🚀 Production Deployment
 
-### Environment Variables for Production
-```bash
-# Production OpenAI API key
-export OPENAI_API_KEY="sk-prod-your-key"
-
- 
-```
-
- 
-
 ### Scaling Considerations
 - **Horizontal Scaling**: Stateless design supports multiple instances
  
@@ -647,8 +556,6 @@ export OPENAI_API_KEY="sk-prod-your-key"
 - **Prometheus/Grafana**: Custom metrics dashboard
 - **Alerting**: Set up alerts for critical failures
 - **Health Checks**: Endpoint monitoring for all PSPs
-
-
 
 ## 🧪 Testing
 

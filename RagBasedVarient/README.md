@@ -432,97 +432,7 @@ SELECT * FROM pg_extension WHERE extname = 'vector';
 SELECT key, content FROM psp_lessons LIMIT 5;
 ```
 
-### 2. Environment Configuration
-
-```bash
-# Windows (PowerShell)
-$env:OPENAI_API_KEY="sk-your-openai-key"
-$env:PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
-
-# Linux/Mac
-export OPENAI_API_KEY="sk-your-openai-key"
-export PGVECTOR_CONNSTR="Host=localhost;Username=postgres;Password=postgres;Database=psp_router"
-```
-
-### 3. Configuration Management
-
-The application uses hierarchical configuration with the following precedence (highest to lowest):
-
-1. **Command Line Arguments**: `dotnet run -- --setting=value`
-2. **Environment Variables**: `OPENAI_API_KEY`, `PGVECTOR_CONNSTR`
-3. **appsettings.{Environment}.json**: Environment-specific settings
-4. **appsettings.json**: Default configuration
-
-#### Configuration Files
-
-**`appsettings.json`** (default):
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft": "Warning"
-    }
-  },
-  "PspRouter": {
-    "OpenAI": {
-      "Model": "gpt-4.1",
-      "EmbeddingModel": "text-embedding-3-large"
-    },
-    "Bandit": {
-      "Epsilon": 0.1,
-      "Algorithm": "ContextualEpsilonGreedy"
-    },
-    "Database": {
-      "TableName": "psp_lessons"
-    }
-  }
-}
-```
-
-**`appsettings.Production.json`** (production overrides):
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Warning",
-      "PspRouter": "Information"
-    }
-  },
-  "PspRouter": {
-    "Bandit": {
-      "Epsilon": 0.05
-    }
-  }
-}
-```
-
-### 4. Service Registration & Lifetimes
-
-The application uses proper dependency injection with appropriate service lifetimes:
-
-```csharp
-// Singleton services (shared across the application)
-services.AddSingleton<IHealthProvider, DummyHealthProvider>();
-services.AddSingleton<IFeeQuoteProvider, DummyFeeProvider>();
-services.AddSingleton<IChatClient>(provider => new OpenAIChatClient(apiKey, model: "gpt-4.1"));
-services.AddSingleton<OpenAIEmbeddings>(provider => new OpenAIEmbeddings(apiKey, model: "text-embedding-3-large"));
-services.AddSingleton<IVectorMemory>(provider => new PgVectorMemory(pgConn, table: "psp_lessons"));
-services.AddSingleton<IContextualBandit>(provider => new ContextualEpsilonGreedyBandit(epsilon: 0.1, logger: logger));
-
-// Scoped services (per request/operation)
-services.AddScoped<PspRouter.PspRouter>(provider => /* ... */);
-
-// Transient services (new instance each time)
-services.AddTransient<PspRouterDemo>();
-```
-
-**Service Lifetime Benefits:**
-- **Singleton**: Shared state, efficient resource usage (health providers, embeddings)
-- **Scoped**: Per-operation state, thread-safe (PSP router instances)
-- **Transient**: No shared state, always fresh (demo services)
-
-### 5. Build and Run the Application
+### 2. Build and Run the Application
 
 ```bash
 # Build all projects
@@ -823,15 +733,6 @@ reward = baseAuthReward - feePenalty + speedBonus - riskPenalty
 7. **Continuous Improvement**: Better decisions over time
 
 ## 🚀 Production Deployment
-
-### Environment Variables for Production
-```bash
-# Production OpenAI API key
-export OPENAI_API_KEY="sk-prod-your-key"
-
-# Production database connection
-export PGVECTOR_CONNSTR="Host=prod-db-host;Username=psp_router;Password=secure-password;Database=psp_router;Port=5432;SSL Mode=Require"
-```
 
 ### Database Security
 ```sql

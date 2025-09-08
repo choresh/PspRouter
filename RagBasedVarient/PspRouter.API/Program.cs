@@ -43,11 +43,9 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Configure PSP Router services
-var configuration = builder.Configuration;
-var apiKey = configuration["OPENAI_API_KEY"] ?? "sk-...";
-var pgConn = configuration["PGVECTOR_CONNSTR"] 
-     ?? "Host=localhost;Username=postgres;Password=postgres;Database=psp_router";
+// Get .env file variables
+var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+var pgConn = Environment.GetEnvironmentVariable("PGVECTOR_CONNSTR"); // "Host=localhost;Username=postgres;Password=postgres;Database=psp_router";
 
 // === Register Core Services ===
 builder.Services.AddSingleton<IHealthProvider, PspRouter.API.DummyHealthProvider>();

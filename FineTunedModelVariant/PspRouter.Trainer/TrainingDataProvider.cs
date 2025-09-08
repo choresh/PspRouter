@@ -15,42 +15,28 @@ public class TrainingDataProvider : ITrainingDataProvider
     {
         _logger = logger;
         _configuration = configuration;
+
+        // Get .env file variables
+        var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION");
         
-        // Try multiple sources for connection string (in order of preference)
-        _connectionString = GetConnectionString();
-    }
-
-    private string GetConnectionString()
-    {
-        // 1. Environment variable (most secure) - includes .env file variables
-        var envConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION");
-        if (!string.IsNullOrEmpty(envConnectionString))
+        // Ensure TrustServerCertificate=true is included to handle SSL certificate issues
+        if (!string.IsNullOrEmpty(baseConnectionString))
         {
-            _logger.LogInformation("Using connection string from environment variable (.env file or system environment)");
-            return envConnectionString;
+            if (!baseConnectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase))
+            {
+                _connectionString = baseConnectionString.TrimEnd(';') + ";TrustServerCertificate=true;";
+            }
+            else
+            {
+                _connectionString = baseConnectionString;
+            }
         }
-
-        // 2. User secrets (for development)
-        var userSecretsConnectionString = _configuration.GetConnectionString("DefaultConnection");
-        if (!string.IsNullOrEmpty(userSecretsConnectionString))
+        else
         {
-            _logger.LogInformation("Using connection string from configuration");
-            return userSecretsConnectionString;
+            _connectionString = string.Empty;
         }
-
-        // 3. Azure Key Vault (if configured)
-        var keyVaultConnectionString = _configuration["ConnectionStrings:DefaultConnection"];
-        if (!string.IsNullOrEmpty(keyVaultConnectionString))
-        {
-            _logger.LogInformation("Using connection string from Key Vault");
-            return keyVaultConnectionString;
-        }
-
-        throw new InvalidOperationException(
-            "Database connection string not found. Please set one of the following:\n" +
-            "1. Environment variable: PSPROUTER_DB_CONNECTION\n" +
-            "2. User secrets: dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"your-connection-string\"\n" +
-            "3. Azure Key Vault configuration");
+        
+        _logger.LogInformation("Using connection string from environment variable (.env file or system environment)");
     }
 
     public async Task<IEnumerable<TrainingData>> GetTrainingDataAsync(CancellationToken cancellationToken = default)

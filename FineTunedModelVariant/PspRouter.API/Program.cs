@@ -43,10 +43,9 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Configure PSP Router services
-var configuration = builder.Configuration;
-var apiKey = configuration["OPENAI_API_KEY"] ?? "sk-...";
-var ftModel = configuration["OPENAI_FT_MODEL"] ?? configuration["PspRouter:OpenAI:FineTunedModel"] ?? "gpt-4.1";
+// Get .env file variables
+var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+var ftModel = Environment.GetEnvironmentVariable("OPENAI_FT_MODEL");
 
 // === Register Core Services ===
 builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.DummyCapabilityProvider>();

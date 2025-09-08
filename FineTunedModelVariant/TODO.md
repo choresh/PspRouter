@@ -35,13 +35,8 @@ This document outlines all the components that need to be implemented or replace
 
 ## 🚀 **Phase 1: Core Functionality**
 
-
 ### 1. **Environment Configuration** ⚠️ **REQUIRED**
-- [ ] Set up environment variables:
-  ```bash
-  OPENAI_API_KEY=sk-your-openai-key-here
-  ```
-- [ ] Create `.env` file or configure in your deployment environment
+- [ ] Set valid OPENAI_API_KEY at your 2 `.env` files
 - [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
 
 #### LLM Setup

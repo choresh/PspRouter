@@ -35,7 +35,7 @@ public class TrainingService : ITrainingService
         return "ft-model-placeholder";
     }
 
-    public async Task<string> UploadTrainingDataAsync(string filePath, CancellationToken cancellationToken = default)
+    public async Task<string> UploadTrainingDataAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Uploading training data from database");
         

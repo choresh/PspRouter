@@ -12,16 +12,6 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
-        // Load .env file if it exists
-        try
-        {
-            Env.Load();
-        }
-        catch (FileNotFoundException)
-        {
-            // .env file not found, that's okay - use other sources
-        }
-        
         var host = CreateHostBuilder(args).Build();
         
         var logger = host.Services.GetRequiredService<ILogger<Program>>();
@@ -42,21 +32,58 @@ public class Program
         Host.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration((context, config) =>
             {
+                // Load .env file first, before other configuration sources
+                try
+                {
+                    // Try multiple locations for .env file
+                    var envPaths = new[]
+                    {
+                        Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".env"),
+                        Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "", ".env")
+                    };
+
+                    bool envLoaded = false;
+                    foreach (var envPath in envPaths)
+                    {
+                        if (File.Exists(envPath))
+                        {
+                            Env.Load(envPath);
+                            Console.WriteLine($"✅ .env file loaded successfully from: {envPath}");
+                            envLoaded = true;
+                            break;
+                        }
+                    }
+
+                    if (!envLoaded)
+                    {
+                        Console.WriteLine("⚠️ .env file not found in any of these locations:");
+                        foreach (var path in envPaths)
+                        {
+                            Console.WriteLine($"   - {path}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error loading .env file: {ex.Message}");
+                }
+                
+                /*
                 config.SetBasePath(Directory.GetCurrentDirectory())
                       .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                       .AddJsonFile($"appsettings.{context.HostingEnvironment.EnvironmentName}.json", optional: true)
                       .AddEnvironmentVariables()
                       .AddCommandLine(args);
+                */
             })
             .ConfigureServices((context, services) =>
             {
-                var configuration = context.Configuration;
-                
-                // Register OpenAI client
-                var openAiApiKey = configuration["OPENAI_API_KEY"] ?? 
-                                 throw new InvalidOperationException("OpenAI API key not found in configuration");
-                
-                services.AddSingleton<OpenAIClient>(provider => new OpenAIClient(openAiApiKey));
+                // Get .env file variables
+                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+                // Register OpenAI client               
+                services.AddSingleton<OpenAIClient>(provider => new OpenAIClient(apiKey));
                 
                 // Register training services
                 services.AddSingleton<ITrainingService, TrainingService>();

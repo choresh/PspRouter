@@ -193,12 +193,8 @@ CREATE TABLE IF NOT EXISTS transaction_outcomes (
 ```
 
 ### 2. **Environment Configuration** ⚠️ **REQUIRED**
-- [ ] Set up environment variables:
-  ```bash
-  OPENAI_API_KEY=sk-your-openai-key-here
-  PGVECTOR_CONNSTR=Host=localhost;Username=postgres;Password=postgres;Database=psp_router
-  ```
-- [ ] Create `.env` file or configure in your deployment environment
+- [ ] Set valid OPENAI_API_KEY at your `.env` file
+- [ ] Set valid PGVECTOR_CONNSTR at your `.env` file
 - [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
 
 ### 3. **Database Setup** ⚠️ **REQUIRED**
