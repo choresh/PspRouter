@@ -27,8 +27,3 @@ public interface ICapabilityProvider
 {
     bool Supports(string pspName, RouteInput tx);
 }
-
-public interface ITrainingDataProvider
-{
-    Task<IEnumerable<TrainingData>> GetTrainingDataAsync(CancellationToken cancellationToken = default);
-}

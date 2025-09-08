@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using PspRouter.Lib;
 using System.Text;
 using System.Text.Json;
 
@@ -37,7 +36,7 @@ public class TrainingService : ITrainingService
             
             // 2. Create fine-tuning job
             _logger.LogInformation("Step 2: Creating fine-tuning job...");
-            var jobId = await CreateFineTuningJobAsync(fileId, cancellationToken);
+            var jobId = await CreateFineTuningJob(fileId, cancellationToken);
             
             // 3. Monitor job status until completion
             _logger.LogInformation("Step 3: Monitoring fine-tuning job status...");
@@ -61,13 +60,13 @@ public class TrainingService : ITrainingService
         
         while (DateTime.UtcNow - startTime < maxWaitTime)
         {
-            var status = await GetFineTuningJobStatusAsync(jobId, cancellationToken);
+            var status = await GetFineTuningJobStatus(jobId, cancellationToken);
             
             switch (status.ToLower())
             {
                 case "succeeded":
                     // Get the fine-tuned model ID
-                    var fineTuningJob = await GetFineTuningJobDetailsAsync(jobId, cancellationToken);
+                    var fineTuningJob = await GetFineTuningJobDetails(jobId, cancellationToken);
                     if (fineTuningJob.FineTunedModel != null)
                     {
                         return fineTuningJob.FineTunedModel;
@@ -118,7 +117,7 @@ public class TrainingService : ITrainingService
             try
             {
                 // Upload to OpenAI Files API using HTTP
-                var fileId = await UploadFileToOpenAIAsync(tempFilePath, cancellationToken);
+                var fileId = await UploadFileToOpenAI(tempFilePath, cancellationToken);
                 
                 _logger.LogInformation("Successfully uploaded training file to OpenAI. File ID: {FileId}", fileId);
                 
@@ -140,14 +139,14 @@ public class TrainingService : ITrainingService
         }
     }
 
-    public async Task<string> CreateFineTuningJobAsync(string fileId, CancellationToken cancellationToken = default)
+    public async Task<string> CreateFineTuningJob(string fileId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Creating fine-tuning job for file {FileId}", fileId);
         
         try
         {
             // Create fine-tuning job using HTTP API
-            var jobId = await CreateFineTuningJobViaHttpAsync(fileId, cancellationToken);
+            var jobId = await CreateFineTuningJobViaHttp(fileId, cancellationToken);
             
             _logger.LogInformation("Successfully created fine-tuning job. Job ID: {JobId}", jobId);
             
@@ -160,14 +159,14 @@ public class TrainingService : ITrainingService
         }
     }
 
-    public async Task<string> GetFineTuningJobStatusAsync(string jobId, CancellationToken cancellationToken = default)
+    public async Task<string> GetFineTuningJobStatus(string jobId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Getting status for fine-tuning job {JobId}", jobId);
         
         try
         {
             // Get fine-tuning job status from HTTP API
-            var jobDetails = await GetFineTuningJobDetailsAsync(jobId, cancellationToken);
+            var jobDetails = await GetFineTuningJobDetails(jobId, cancellationToken);
             
             _logger.LogInformation("Fine-tuning job {JobId} status: {Status}", jobId, jobDetails.Status);
             
@@ -202,7 +201,7 @@ public class TrainingService : ITrainingService
             
             var userInstruction = $"Route this transaction: Order {data.OrderId}, Amount: {data.Amount}, PaymentGateway: {data.PaymentGatewayId}, Method: {data.PaymentMethodId}, Currency: {data.CurrencyId}, Country: {data.CountryId}, Card BIN: {data.PaymentCardBin}, 3DS: {data.ThreeDSTypeId}, Tokenized: {data.IsTokenized}";
             
-            var contextJson = System.Text.Json.JsonSerializer.Serialize(new
+            var contextJson = JsonSerializer.Serialize(new
             {
                 orderId = data.OrderId,
                 amount = data.Amount,
@@ -234,7 +233,7 @@ public class TrainingService : ITrainingService
                 _ => $"Status_{data.PaymentTransactionStatusId}"
             };
             
-            var expectedResponse = System.Text.Json.JsonSerializer.Serialize(new
+            var expectedResponse = JsonSerializer.Serialize(new
             {
                 recommendedPsp = data.PaymentGatewayId,
                 reasoning = $"Based on transaction context, PSP {data.PaymentGatewayId} was selected and resulted in {statusName}",
@@ -256,7 +255,7 @@ public class TrainingService : ITrainingService
                 }
             };
             
-            var jsonLine = System.Text.Json.JsonSerializer.Serialize(trainingExample);
+            var jsonLine = JsonSerializer.Serialize(trainingExample);
             jsonlLines.Add(jsonLine);
         }
         
@@ -264,7 +263,7 @@ public class TrainingService : ITrainingService
     }
     
     // HTTP-based OpenAI API implementations
-    private async Task<string> UploadFileToOpenAIAsync(string filePath, CancellationToken cancellationToken)
+    private async Task<string> UploadFileToOpenAI(string filePath, CancellationToken cancellationToken)
     {
         using var formData = new MultipartFormDataContent();
         using var fileContent = new ByteArrayContent(await File.ReadAllBytesAsync(filePath, cancellationToken));
@@ -282,7 +281,7 @@ public class TrainingService : ITrainingService
         return fileResponse.GetProperty("id").GetString() ?? throw new InvalidOperationException("File ID not returned from OpenAI API");
     }
     
-    private async Task<string> CreateFineTuningJobViaHttpAsync(string fileId, CancellationToken cancellationToken)
+    private async Task<string> CreateFineTuningJobViaHttp(string fileId, CancellationToken cancellationToken)
     {
         var requestBody = new
         {
@@ -303,7 +302,7 @@ public class TrainingService : ITrainingService
         return jobResponse.GetProperty("id").GetString() ?? throw new InvalidOperationException("Job ID not returned from OpenAI API");
     }
     
-    private async Task<FineTuningJobDetails> GetFineTuningJobDetailsAsync(string jobId, CancellationToken cancellationToken)
+    private async Task<FineTuningJobDetails> GetFineTuningJobDetails(string jobId, CancellationToken cancellationToken)
     {
         var response = await _httpClient.GetAsync($"https://api.openai.com/v1/fine_tuning/jobs/{jobId}", cancellationToken);
         response.EnsureSuccessStatusCode();

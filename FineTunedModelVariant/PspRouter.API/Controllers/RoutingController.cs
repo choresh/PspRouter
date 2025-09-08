@@ -60,7 +60,7 @@ public class RoutingController : ControllerBase
     [HttpGet("health")]
     public ActionResult<object> GetHealth()
     {
-        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var assembly = Assembly.GetExecutingAssembly();
         var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
         var informationalVersion = assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
         

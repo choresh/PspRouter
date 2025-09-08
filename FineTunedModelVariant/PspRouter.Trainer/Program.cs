@@ -1,8 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenAI;
-using PspRouter.Lib;
 using DotNetEnv;
 
 namespace PspRouter.Trainer;
@@ -77,13 +75,7 @@ public class Program
                 */
             })
             .ConfigureServices((context, services) =>
-            {
-                // Get .env file variable
-                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
-
-                // Register OpenAI client               
-                services.AddSingleton<OpenAIClient>(provider => new OpenAIClient(apiKey));
-                
+            {       
                 // Register training services
                 services.AddSingleton<ITrainingService, TrainingService>();
                 services.AddSingleton<ITrainingDataProvider, TrainingDataProvider>();

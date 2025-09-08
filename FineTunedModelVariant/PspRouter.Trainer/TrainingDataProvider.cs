@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
-using PspRouter.Lib;
 
 namespace PspRouter.Trainer;
 
