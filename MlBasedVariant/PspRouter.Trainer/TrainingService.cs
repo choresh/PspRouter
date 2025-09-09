@@ -29,7 +29,7 @@ public class TrainingService : ITrainingService
         _mlContext = new MLContext(seed: _config.Seed);
     }
 
-    public async Task<string> TrainModelAsync(CancellationToken cancellationToken = default)
+    public async Task<string> TrainModel(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Starting LightGBM model training...");
         
@@ -37,7 +37,7 @@ public class TrainingService : ITrainingService
         {
             // 1. Load training data
             _logger.LogInformation("Step 1: Loading training data...");
-            var trainingData = await _trainingDataProvider.GetTrainingDataAsync(cancellationToken);
+            var trainingData = await _trainingDataProvider.GetTrainingData(cancellationToken);
             
             // 2. Extract features
             _logger.LogInformation("Step 2: Extracting features...");
@@ -78,7 +78,7 @@ public class TrainingService : ITrainingService
             
             // 8. Save the model
             var modelPath = "models/psp_routing_model.zip";
-            await SaveModelAsync(modelPath, cancellationToken);
+            await SaveModel(modelPath, cancellationToken);
             
             return modelPath;
         }
@@ -89,7 +89,7 @@ public class TrainingService : ITrainingService
         }
     }
 
-    public async Task<ModelMetrics> EvaluateModelAsync(string modelPath, CancellationToken cancellationToken = default)
+    private async Task<ModelMetrics> EvaluateModel(string modelPath, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Evaluating model from {ModelPath}", modelPath);
         
@@ -99,7 +99,7 @@ public class TrainingService : ITrainingService
             var model = _mlContext.Model.Load(modelPath, out var modelInputSchema);
             
             // Load test data
-            var trainingData = await _trainingDataProvider.GetTrainingDataAsync(cancellationToken);
+            var trainingData = await _trainingDataProvider.GetTrainingData(cancellationToken);
             var testExamples = _featureExtractor.ExtractFeatures(trainingData).ToList();
             var dataView = _mlContext.Data.LoadFromEnumerable(testExamples);
             
@@ -134,7 +134,7 @@ public class TrainingService : ITrainingService
         }
     }
 
-    public Task<bool> SaveModelAsync(string modelPath, CancellationToken cancellationToken = default)
+    private Task<bool> SaveModel(string modelPath, CancellationToken cancellationToken = default)
     {
         if (_trainedModel == null)
         {
@@ -178,7 +178,7 @@ public class TrainingService : ITrainingService
         }
     }
 
-    public Task<bool> LoadModelAsync(string modelPath, CancellationToken cancellationToken = default)
+    private Task<bool> LoadModel(string modelPath, CancellationToken cancellationToken = default)
     {
         try
         {

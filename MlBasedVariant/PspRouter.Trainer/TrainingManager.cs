@@ -29,13 +29,13 @@ public class TrainingManager : BackgroundService
             _logger.LogInformation("Starting LightGBM model training process...");
             
             // Train the model
-            var modelPath = await _trainingService.TrainModelAsync(stoppingToken);
+            var modelPath = await _trainingService.TrainModel(stoppingToken);
             
             _logger.LogInformation("🎉 Model training completed successfully! Model saved to: {ModelPath}", modelPath);
             
             // Evaluate the model
             _logger.LogInformation("Evaluating trained model...");
-            var metrics = await _trainingService.EvaluateModelAsync(modelPath, stoppingToken);
+            var metrics = await _trainingService.EvaluateModel(modelPath, stoppingToken);
             
             _logger.LogInformation("Model Evaluation Results:");
             _logger.LogInformation("  Accuracy: {Accuracy:F4}", metrics.Accuracy);

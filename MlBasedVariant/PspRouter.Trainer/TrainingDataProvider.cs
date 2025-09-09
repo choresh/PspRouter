@@ -37,7 +37,7 @@ public class TrainingDataProvider : ITrainingDataProvider
         _logger.LogInformation("Using connection string from environment variable (.env file or system environment)");
     }
 
-    public async Task<IEnumerable<TrainingData>> GetTrainingDataAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<TrainingData>> GetTrainingData(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Fetching training data from SQL Server");
         
