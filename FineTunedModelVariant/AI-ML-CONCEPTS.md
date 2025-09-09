@@ -178,11 +178,11 @@ var valid = ctx.Candidates
     "AuthWeight": 1.2,
     "FeeBpsWeight": 0.8,
     "FixedFeeWeight": 0.5,
-    "BusinessBiasWeight": 0.1,
-    "BusinessBias": { "Adyen": 0.02, "Stripe": -0.01 },
     "Supports3DSBonusWhenSCARequired": 0.0,
     "RiskScorePenaltyPerPoint": 0.0,
-    "HealthYellowPenalty": 0.0
+    "HealthYellowPenalty": 0.0,
+    "BusinessBiasWeight": 0.1,
+    "BusinessBias": { "Adyen": 0.02, "Stripe": -0.01 },
   }
 }
 ```

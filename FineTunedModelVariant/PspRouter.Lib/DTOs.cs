@@ -56,11 +56,12 @@ public sealed class ScoringWeights
     public double AuthWeight { get; init; } = 1.0;
     public double FeeBpsWeight { get; init; } = 1.0;
     public double FixedFeeWeight { get; init; } = 1.0;
-    public double BusinessBiasWeight { get; init; } = 0.0;
-    public Dictionary<string, double> BusinessBias { get; init; } = new();
     public double Supports3DSBonusWhenSCARequired { get; init; } = 0.0;
     public double RiskScorePenaltyPerPoint { get; init; } = 0.0; // 0..1 per risk point (0-100)
     public double HealthYellowPenalty { get; init; } = 0.0;
+    public double BusinessBiasWeight { get; init; } = 0.0;
+    public Dictionary<string, double> BusinessBias { get; init; } = new();
+
 }
 
 public record TransactionOutcome(
