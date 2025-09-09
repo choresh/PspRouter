@@ -1,335 +1,258 @@
-﻿using Microsoft.Extensions.Logging;
-using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.ML;
 using System.Text.Json;
 
 namespace PspRouter.Trainer;
 
-// Training service implementation
+/// <summary>
+/// LightGBM-based training service for PSP routing
+/// </summary>
 public class TrainingService : ITrainingService
 {
-    private readonly HttpClient _httpClient;
     private readonly ILogger<TrainingService> _logger;
     private readonly ITrainingDataProvider _trainingDataProvider;
-    private readonly string _apiKey;
+    private readonly FeatureExtractor _featureExtractor;
+    private readonly ModelTrainingConfig _config;
+    private readonly MLContext _mlContext;
+    private ITransformer? _trainedModel;
 
-    public TrainingService(ILogger<TrainingService> logger, ITrainingDataProvider trainingDataProvider)
+    public TrainingService(
+        ILogger<TrainingService> logger,
+        ITrainingDataProvider trainingDataProvider,
+        FeatureExtractor featureExtractor,
+        ModelTrainingConfig config)
     {
         _logger = logger;
         _trainingDataProvider = trainingDataProvider;
-        
-        // Get .env file variables
-        _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
-        
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+        _featureExtractor = featureExtractor;
+        _config = config;
+        _mlContext = new MLContext(seed: _config.Seed);
     }
 
-    public async Task<string> CreateFineTunedModel(CancellationToken cancellationToken = default)
+    public async Task<string> TrainModelAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Creating fine-tuned model...");
+        _logger.LogInformation("Starting LightGBM model training...");
         
         try
         {
-            // 1. Upload training data
-            _logger.LogInformation("Step 1: Uploading training data...");
-            var fileId = await UploadTrainingDataAsync(cancellationToken);
-            
-            // 2. Create fine-tuning job
-            _logger.LogInformation("Step 2: Creating fine-tuning job...");
-            var jobId = await CreateFineTuningJob(fileId, cancellationToken);
-            
-            // 3. Monitor job status until completion
-            _logger.LogInformation("Step 3: Monitoring fine-tuning job status...");
-            var modelId = await MonitorFineTuningJobAsync(jobId, cancellationToken);
-            
-            _logger.LogInformation("Fine-tuned model created successfully: {ModelId}", modelId);
-            return modelId;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating fine-tuned model");
-            throw;
-        }
-    }
-    
-    private async Task<string> MonitorFineTuningJobAsync(string jobId, CancellationToken cancellationToken = default)
-    {
-        var maxWaitTime = TimeSpan.FromHours(2); // Maximum wait time
-        var checkInterval = TimeSpan.FromMinutes(1); // Check every minute
-        var startTime = DateTime.UtcNow;
-        
-        while (DateTime.UtcNow - startTime < maxWaitTime)
-        {
-            var status = await GetFineTuningJobStatus(jobId, cancellationToken);
-            
-            switch (status.ToLower())
-            {
-                case "succeeded":
-                    // Get the fine-tuned model ID
-                    var fineTuningJob = await GetFineTuningJobDetails(jobId, cancellationToken);
-                    if (fineTuningJob.FineTunedModel != null)
-                    {
-                        return fineTuningJob.FineTunedModel;
-                    }
-                    throw new InvalidOperationException("Fine-tuning job succeeded but no model ID was returned");
-                
-                case "failed":
-                case "cancelled":
-                    throw new InvalidOperationException($"Fine-tuning job {jobId} {status}");
-                
-                case "validating_files":
-                case "queued":
-                case "running":
-                    _logger.LogInformation("Fine-tuning job {JobId} is {Status}. Waiting...", jobId, status);
-                    await Task.Delay(checkInterval, cancellationToken);
-                    break;
-                
-                default:
-                    _logger.LogWarning("Unknown fine-tuning job status: {Status}", status);
-                    await Task.Delay(checkInterval, cancellationToken);
-                    break;
-            }
-        }
-        
-        throw new TimeoutException($"Fine-tuning job {jobId} did not complete within {maxWaitTime}");
-    }
-
-    public async Task<string> UploadTrainingDataAsync(CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Uploading training data from database");
-        
-        try
-        {
-            // Get training data from the database
+            // 1. Load training data
+            _logger.LogInformation("Step 1: Loading training data...");
             var trainingData = await _trainingDataProvider.GetTrainingDataAsync(cancellationToken);
             
-            _logger.LogInformation("Retrieved {Count} training data records from database", trainingData.Count());
+            // 2. Extract features
+            _logger.LogInformation("Step 2: Extracting features...");
+            var trainingExamples = _featureExtractor.ExtractFeatures(trainingData).ToList();
             
-            // Convert training data to JSONL format for OpenAI
-            var jsonlContent = ConvertTrainingDataToJsonl(trainingData);
-            
-            // Create a temporary file for upload
-            var tempFilePath = Path.GetTempFileName();
-            await File.WriteAllTextAsync(tempFilePath, jsonlContent, cancellationToken);
-            
-            _logger.LogInformation("Created temporary training file: {TempFilePath}", tempFilePath);
-            
-            try
+            if (trainingExamples.Count == 0)
             {
-                // Upload to OpenAI Files API using HTTP
-                var fileId = await UploadFileToOpenAI(tempFilePath, cancellationToken);
-                
-                _logger.LogInformation("Successfully uploaded training file to OpenAI. File ID: {FileId}", fileId);
-                
-                return fileId;
+                throw new InvalidOperationException("No training examples extracted from data");
             }
-            finally
-            {
-                // Clean up temp file
-                if (File.Exists(tempFilePath))
-                {
-                    File.Delete(tempFilePath);
-                }
-            }
+            
+            _logger.LogInformation("Extracted {Count} training examples", trainingExamples.Count);
+            
+            // 3. Prepare ML.NET data
+            _logger.LogInformation("Step 3: Preparing ML.NET data...");
+            var dataView = _mlContext.Data.LoadFromEnumerable(trainingExamples);
+            
+            // 4. Split data for training and validation
+            _logger.LogInformation("Step 4: Splitting data for training and validation...");
+            var trainTestSplit = _mlContext.Data.TrainTestSplit(dataView, testFraction: _config.ValidationFraction);
+            
+            // 5. Define training pipeline
+            _logger.LogInformation("Step 5: Defining training pipeline...");
+            var pipeline = CreateTrainingPipeline();
+            
+            // 6. Train the model
+            _logger.LogInformation("Step 6: Training LightGBM model...");
+            _trainedModel = pipeline.Fit(trainTestSplit.TrainSet);
+            
+            // 7. Evaluate the model
+            _logger.LogInformation("Step 7: Evaluating model...");
+            var predictions = _trainedModel.Transform(trainTestSplit.TestSet);
+            var metrics = _mlContext.BinaryClassification.Evaluate(predictions);
+            
+            _logger.LogInformation("Model training completed successfully!");
+            _logger.LogInformation("Accuracy: {Accuracy:F4}", metrics.Accuracy);
+            _logger.LogInformation("AUC: {AUC:F4}", metrics.AreaUnderRocCurve);
+            _logger.LogInformation("F1 Score: {F1Score:F4}", metrics.F1Score);
+            
+            // 8. Save the model
+            var modelPath = "models/psp_routing_model.zip";
+            await SaveModelAsync(modelPath, cancellationToken);
+            
+            return modelPath;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error uploading training data");
+            _logger.LogError(ex, "Error training LightGBM model");
             throw;
         }
     }
 
-    public async Task<string> CreateFineTuningJob(string fileId, CancellationToken cancellationToken = default)
+    public async Task<ModelMetrics> EvaluateModelAsync(string modelPath, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Creating fine-tuning job for file {FileId}", fileId);
+        _logger.LogInformation("Evaluating model from {ModelPath}", modelPath);
         
         try
         {
-            // Create fine-tuning job using HTTP API
-            var jobId = await CreateFineTuningJobViaHttp(fileId, cancellationToken);
+            // Load the model
+            var model = _mlContext.Model.Load(modelPath, out var modelInputSchema);
             
-            _logger.LogInformation("Successfully created fine-tuning job. Job ID: {JobId}", jobId);
+            // Load test data
+            var trainingData = await _trainingDataProvider.GetTrainingDataAsync(cancellationToken);
+            var testExamples = _featureExtractor.ExtractFeatures(trainingData).ToList();
+            var dataView = _mlContext.Data.LoadFromEnumerable(testExamples);
             
-            return jobId;
+            // Split for evaluation (use last 20% as test)
+            var testCount = (int)(testExamples.Count * 0.2);
+            var testData = testExamples.TakeLast(testCount);
+            var testDataView = _mlContext.Data.LoadFromEnumerable(testData);
+            
+            // Make predictions
+            var predictions = model.Transform(testDataView);
+            
+            // Calculate metrics
+            var metrics = _mlContext.BinaryClassification.Evaluate(predictions);
+            
+            // Get feature importance
+            var featureImportance = GetFeatureImportance(model);
+            
+            return new ModelMetrics(
+                Accuracy: (float)metrics.Accuracy,
+                Precision: (float)metrics.PositivePrecision,
+                Recall: (float)metrics.PositiveRecall,
+                F1Score: (float)metrics.F1Score,
+                AUC: (float)metrics.AreaUnderRocCurve,
+                LogLoss: (float)metrics.LogLoss,
+                FeatureImportance: featureImportance
+            );
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating fine-tuning job for file {FileId}", fileId);
+            _logger.LogError(ex, "Error evaluating model from {ModelPath}", modelPath);
             throw;
         }
     }
 
-    public async Task<string> GetFineTuningJobStatus(string jobId, CancellationToken cancellationToken = default)
+    public Task<bool> SaveModelAsync(string modelPath, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Getting status for fine-tuning job {JobId}", jobId);
+        if (_trainedModel == null)
+        {
+            _logger.LogError("No trained model to save");
+            return Task.FromResult(false);
+        }
         
         try
         {
-            // Get fine-tuning job status from HTTP API
-            var jobDetails = await GetFineTuningJobDetails(jobId, cancellationToken);
+            _logger.LogInformation("Saving model to {ModelPath}", modelPath);
             
-            _logger.LogInformation("Fine-tuning job {JobId} status: {Status}", jobId, jobDetails.Status);
-            
-            // Log additional details if available
-            if (jobDetails.FineTunedModel != null)
+            // Ensure directory exists
+            var directory = Path.GetDirectoryName(modelPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
-                _logger.LogInformation("Fine-tuned model: {ModelId}", jobDetails.FineTunedModel);
+                Directory.CreateDirectory(directory);
             }
             
-            if (jobDetails.Error != null)
-            {
-                _logger.LogError("Fine-tuning job {JobId} failed with error: {Error}", jobId, jobDetails.Error.Message);
-            }
+            // Save the model
+            _mlContext.Model.Save(_trainedModel, null, modelPath);
             
-            return jobDetails.Status ?? "unknown";
+            // Save model metadata
+            var metadataPath = Path.ChangeExtension(modelPath, ".metadata.json");
+            var metadata = new
+            {
+                ModelType = "LightGBM",
+                TrainingDate = DateTime.UtcNow,
+                Config = _config,
+                Version = "1.0"
+            };
+            
+            File.WriteAllText(metadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
+            
+            _logger.LogInformation("Model saved successfully to {ModelPath}", modelPath);
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting status for fine-tuning job {JobId}", jobId);
-            throw;
+            _logger.LogError(ex, "Error saving model to {ModelPath}", modelPath);
+            return Task.FromResult(false);
         }
     }
 
-    private string ConvertTrainingDataToJsonl(IEnumerable<TrainingData> trainingData)
+    public Task<bool> LoadModelAsync(string modelPath, CancellationToken cancellationToken = default)
     {
-        var jsonlLines = new List<string>();
-        
-        foreach (var data in trainingData)
+        try
         {
-            // Create training examples from real transaction data
-            var systemPrompt = "You are a payment service provider (PSP) routing assistant. Your job is to analyze transaction context and recommend the best PSP for processing.";
+            _logger.LogInformation("Loading model from {ModelPath}", modelPath);
             
-            var userInstruction = $"Route this transaction: Order {data.OrderId}, Amount: {data.Amount}, PaymentGateway: {data.PaymentGatewayId}, Method: {data.PaymentMethodId}, Currency: {data.CurrencyId}, Country: {data.CountryId}, Card BIN: {data.PaymentCardBin}, 3DS: {data.ThreeDSTypeId}, Tokenized: {data.IsTokenized}";
-            
-            var contextJson = JsonSerializer.Serialize(new
+            if (!File.Exists(modelPath))
             {
-                orderId = data.OrderId,
-                amount = data.Amount,
-                paymentGatewayId = data.PaymentGatewayId,
-                paymentMethodId = data.PaymentMethodId,
-                currencyId = data.CurrencyId,
-                countryId = data.CountryId,
-                paymentCardBin = data.PaymentCardBin,
-                threeDSTypeId = data.ThreeDSTypeId,
-                isTokenized = data.IsTokenized,
-                isRerouted = data.IsReroutedFlag,
-                routingRuleId = data.PaymentRoutingRuleId
-            });
+                _logger.LogError("Model file not found: {ModelPath}", modelPath);
+                return Task.FromResult(false);
+            }
             
-            // Determine success based on status IDs
-            var isSuccessful = data.PaymentTransactionStatusId == 5 || // Authorized
-                              data.PaymentTransactionStatusId == 7 || // Captured  
-                              data.PaymentTransactionStatusId == 9;   // Settled
+            _trainedModel = _mlContext.Model.Load(modelPath, out var modelInputSchema);
             
-            var statusName = data.PaymentTransactionStatusId switch
-            {
-                5 => "Authorized",
-                7 => "Captured", 
-                9 => "Settled",
-                11 => "Refused",
-                15 => "ChargeBack",
-                17 => "Error",
-                22 => "AuthorizationFailed",
-                _ => $"Status_{data.PaymentTransactionStatusId}"
-            };
-            
-            var expectedResponse = JsonSerializer.Serialize(new
-            {
-                recommendedPsp = data.PaymentGatewayId,
-                reasoning = $"Based on transaction context, PSP {data.PaymentGatewayId} was selected and resulted in {statusName}",
-                success = isSuccessful,
-                status = statusName,
-                statusId = data.PaymentTransactionStatusId,
-                pspReference = data.PspReference,
-                gatewayResponse = data.GatewayResponseCode,
-                wasRerouted = data.IsReroutedFlag
-            });
-            
-            var trainingExample = new
-            {
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userInstruction },
-                    new { role = "assistant", content = expectedResponse }
-                }
-            };
-            
-            var jsonLine = JsonSerializer.Serialize(trainingExample);
-            jsonlLines.Add(jsonLine);
+            _logger.LogInformation("Model loaded successfully from {ModelPath}", modelPath);
+            return Task.FromResult(true);
         }
-        
-        return string.Join("\n", jsonlLines);
-    }
-    
-    // HTTP-based OpenAI API implementations
-    private async Task<string> UploadFileToOpenAI(string filePath, CancellationToken cancellationToken)
-    {
-        using var formData = new MultipartFormDataContent();
-        using var fileContent = new ByteArrayContent(await File.ReadAllBytesAsync(filePath, cancellationToken));
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
-        
-        formData.Add(fileContent, "file", "training_data.jsonl");
-        formData.Add(new StringContent("fine-tune"), "purpose");
-        
-        var response = await _httpClient.PostAsync("https://api.openai.com/v1/files", formData, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        var fileResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
-        
-        return fileResponse.GetProperty("id").GetString() ?? throw new InvalidOperationException("File ID not returned from OpenAI API");
-    }
-    
-    private async Task<string> CreateFineTuningJobViaHttp(string fileId, CancellationToken cancellationToken)
-    {
-        var requestBody = new
+        catch (Exception ex)
         {
-            training_file = fileId,
-            model = "gpt-3.5-turbo",
-            suffix = "psp-router"
+            _logger.LogError(ex, "Error loading model from {ModelPath}", modelPath);
+            return Task.FromResult(false);
+        }
+    }
+
+    private IEstimator<ITransformer> CreateTrainingPipeline()
+    {
+        // Define feature columns
+        var featureColumns = new[]
+        {
+            nameof(RoutingFeatures.Amount),
+            nameof(RoutingFeatures.PaymentMethodId),
+            nameof(RoutingFeatures.CurrencyId),
+            nameof(RoutingFeatures.CountryId),
+            nameof(RoutingFeatures.RiskScore),
+            nameof(RoutingFeatures.IsTokenized),
+            nameof(RoutingFeatures.HasThreeDS),
+            nameof(RoutingFeatures.IsRerouted),
+            nameof(RoutingFeatures.PspAuthRate),
+            nameof(RoutingFeatures.PspFeeBps),
+            nameof(RoutingFeatures.PspFixedFee),
+            nameof(RoutingFeatures.PspSupports3DS),
+            nameof(RoutingFeatures.PspHealth),
+            nameof(RoutingFeatures.PspId),
+            nameof(RoutingFeatures.FeeRatio),
+            nameof(RoutingFeatures.RiskAdjustedAuthRate),
+            nameof(RoutingFeatures.ComplianceScore),
+            nameof(RoutingFeatures.AmountLog),
+            nameof(RoutingFeatures.HourOfDay),
+            nameof(RoutingFeatures.DayOfWeek)
+        };
+
+        return _mlContext.Transforms.Concatenate("Features", featureColumns)
+            .Append(_mlContext.Transforms.NormalizeMinMax("Features"))
+            .Append(_mlContext.BinaryClassification.Trainers.LightGbm(
+                labelColumnName: nameof(RoutingTrainingExample.IsSuccessful),
+                featureColumnName: "Features",
+                numberOfLeaves: _config.NumLeaves,
+                minimumExampleCountPerLeaf: _config.MinDataInLeaf,
+                learningRate: _config.LearningRate,
+                numberOfIterations: _config.MaxIterations));
+    }
+
+    private Dictionary<string, float> GetFeatureImportance(ITransformer model)
+    {
+        // This is a simplified feature importance extraction
+        // In a real implementation, you'd extract this from the LightGBM model
+        var featureNames = new[]
+        {
+            "Amount", "PaymentMethodId", "CurrencyId", "CountryId", "RiskScore",
+            "IsTokenized", "HasThreeDS", "IsRerouted", "PspAuthRate", "PspFeeBps",
+            "PspFixedFee", "PspSupports3DS", "PspHealth", "PspId", "FeeRatio",
+            "RiskAdjustedAuthRate", "ComplianceScore", "AmountLog", "HourOfDay", "DayOfWeek"
         };
         
-        var json = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        
-        var response = await _httpClient.PostAsync("https://api.openai.com/v1/fine_tuning/jobs", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        var jobResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
-        
-        return jobResponse.GetProperty("id").GetString() ?? throw new InvalidOperationException("Job ID not returned from OpenAI API");
-    }
-    
-    private async Task<FineTuningJobDetails> GetFineTuningJobDetails(string jobId, CancellationToken cancellationToken)
-    {
-        var response = await _httpClient.GetAsync($"https://api.openai.com/v1/fine_tuning/jobs/{jobId}", cancellationToken);
-        response.EnsureSuccessStatusCode();
-        
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        var jobResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
-        
-        return new FineTuningJobDetails
-        {
-            Id = jobResponse.GetProperty("id").GetString(),
-            Status = jobResponse.GetProperty("status").GetString(),
-            FineTunedModel = jobResponse.TryGetProperty("fine_tuned_model", out var model) ? model.GetString() : null,
-            Error = jobResponse.TryGetProperty("error", out var error) ? new FineTuningError { Message = error.GetProperty("message").GetString() } : null
-        };
-    }
-    
-    // Helper classes for API responses
-    private class FineTuningJobDetails
-    {
-        public string? Id { get; set; }
-        public string? Status { get; set; }
-        public string? FineTunedModel { get; set; }
-        public FineTuningError? Error { get; set; }
-    }
-    
-    private class FineTuningError
-    {
-        public string? Message { get; set; }
+        // For now, return equal importance (in production, extract from model)
+        return featureNames.ToDictionary(name => name, _ => 1.0f / featureNames.Length);
     }
 }

@@ -75,12 +75,31 @@ public class Program
             })
             .ConfigureServices((context, services) =>
             {       
-                // Bind trainer settings from configuration (optional)
+                // Bind trainer settings from configuration
                 var trainerSettings = new TrainerSettings();
-                context.Configuration.GetSection("Trainer:Sampling").Bind(trainerSettings);
+                context.Configuration.GetSection("Trainer").Bind(trainerSettings);
                 services.AddSingleton(trainerSettings);
                 
-                // Register training services
+                // Create model training config from settings
+                var modelConfig = new ModelTrainingConfig
+                {
+                    MaxIterations = trainerSettings.MaxIterations,
+                    LearningRate = trainerSettings.LearningRate,
+                    NumLeaves = trainerSettings.NumLeaves,
+                    MinDataInLeaf = trainerSettings.MinDataInLeaf,
+                    FeatureFraction = trainerSettings.FeatureFraction,
+                    BaggingFraction = trainerSettings.BaggingFraction,
+                    BaggingFreq = trainerSettings.BaggingFreq,
+                    ValidationFraction = trainerSettings.ValidationFraction,
+                    EarlyStoppingRounds = trainerSettings.EarlyStoppingRounds,
+                    Seed = trainerSettings.Seed,
+                    Objective = trainerSettings.Objective,
+                    Metric = trainerSettings.Metric
+                };
+                services.AddSingleton(modelConfig);
+                
+                // Register ML-based training services
+                services.AddSingleton<FeatureExtractor>();
                 services.AddSingleton<ITrainingService, TrainingService>();
                 services.AddSingleton<ITrainingDataProvider, TrainingDataProvider>();
                 
