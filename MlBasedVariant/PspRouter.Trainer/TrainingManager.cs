@@ -28,31 +28,10 @@ public class TrainingManager : BackgroundService
         {
             _logger.LogInformation("Starting LightGBM model training process...");
             
-            // Train the model
-            var modelPath = await _trainingService.TrainModel(stoppingToken);
+            // Train the model (includes evaluation and feature importance)
+            await _trainingService.TrainModel(stoppingToken);
             
-            _logger.LogInformation("🎉 Model training completed successfully! Model saved to: {ModelPath}", modelPath);
-            
-            // Evaluate the model
-            _logger.LogInformation("Evaluating trained model...");
-            var metrics = await _trainingService.EvaluateModel(modelPath, stoppingToken);
-            
-            _logger.LogInformation("Model Evaluation Results:");
-            _logger.LogInformation("  Accuracy: {Accuracy:F4}", metrics.Accuracy);
-            _logger.LogInformation("  Precision: {Precision:F4}", metrics.Precision);
-            _logger.LogInformation("  Recall: {Recall:F4}", metrics.Recall);
-            _logger.LogInformation("  F1 Score: {F1Score:F4}", metrics.F1Score);
-            _logger.LogInformation("  AUC: {AUC:F4}", metrics.AUC);
-            _logger.LogInformation("  Log Loss: {LogLoss:F4}", metrics.LogLoss);
-            
-            _logger.LogInformation("Top Feature Importance:");
-            foreach (var feature in metrics.FeatureImportance.OrderByDescending(x => x.Value).Take(10))
-            {
-                _logger.LogInformation("  {Feature}: {Importance:F4}", feature.Key, feature.Value);
-            }
-            
-            _logger.LogInformation("✅ LightGBM model is ready for use in PSP routing decisions");
-            _logger.LogInformation("Model file: {ModelPath}", modelPath);
+            _logger.LogInformation("🎉 Complete ML training pipeline finished successfully!");
         }
         catch (Exception ex)
         {
