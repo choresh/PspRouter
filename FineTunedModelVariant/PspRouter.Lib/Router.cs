@@ -57,20 +57,16 @@ public sealed class PspRouter
 
     private async Task<RouteDecision?> DecideWithLLM(RouteContext ctx, List<PspSnapshot> validCandidates, CancellationToken ct)
     {
-        // Retrieve relevant lessons from memory
-        var relevantLessons = await GetRelevantLessons(ctx, ct);
-        
         // Build context for LLM
         var contextJson = JsonSerializer.Serialize(new {
             Transaction = ctx.Tx,
             Candidates = validCandidates,
             MerchantPreferences = ctx.MerchantPrefs,
-            SegmentStats = ctx.SegmentStats,
-            RelevantLessons = relevantLessons
+            SegmentStats = ctx.SegmentStats
         }, new JsonSerializerOptions { WriteIndented = true });
 
         var systemPrompt = BuildSystemPrompt();
-        var userInstruction = $"Route this payment transaction to the optimal PSP. Consider auth rates, fees, compliance requirements, and historical lessons.";
+        var userInstruction = $"Route this payment transaction to the optimal PSP. Consider auth rates, fees, and compliance requirements.";
 
         var response = await _chat.CompleteJson(systemPrompt, userInstruction, contextJson, 0.1, ct);
         
@@ -90,31 +86,6 @@ public sealed class PspRouter
         return null;
     }
 
-    private async Task<List<string>> GetRelevantLessons(RouteContext ctx, CancellationToken ct)
-    {
-        try
-        {
-            // Create a query based on transaction context
-            var query = $"PSP routing for CurrencyId {ctx.Tx.CurrencyId} PaymentMethodId {ctx.Tx.PaymentMethodId} merchant {ctx.Tx.MerchantCountry}";
-            
-            // Note: In a full implementation, you would:
-            // 1. Use OpenAIEmbeddings to embed the query
-            // 2. Search the vector memory with the embedding
-            // 3. Return the top-k relevant lessons
-            
-            // For now, return empty list as embedding integration requires additional setup
-            _logger?.LogDebug("Memory search requires embedding integration - returning empty lessons");
-            
-            // Add a small delay to make this truly async
-            await Task.Delay(1, ct);
-            return new List<string>();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to retrieve relevant lessons from memory");
-            return new List<string>();
-        }
-    }
 
     private static string BuildSystemPrompt()
     {
@@ -125,7 +96,7 @@ public sealed class PspRouter
         1. NEVER route to a PSP that doesn't support the payment method
         2. ALWAYS enforce SCA/3DS requirements when specified
         3. Consider authorization rates, fees, and merchant preferences
-        4. Use historical lessons to inform decisions
+        4. Use learned patterns from training to inform decisions
         5. Provide clear reasoning for your choice
 
         DECISION FACTORS (in order of importance):

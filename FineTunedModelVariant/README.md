@@ -1,28 +1,23 @@
 # 🚀 PSP Router - Intelligent Payment Routing System (Fine-Tuned Model variant)
 
 ## 🎯 Purpose
-Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using a **fine-tuned LLM-based decision engine** with deterministic fallback.
+Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using a **fine-tuned LLM-based decision engine** that learns everything from historical transaction data.
 
 ## 🏗 Solution Overview
 - **3-Project Architecture**: Clean separation with Library, Web API, and Tests
 - **ASP.NET Core Web API**: RESTful API with Swagger documentation
 - **Configuration Management**: JSON + environment variables with hierarchical config
-- **Deterministic Guardrails**: Capabilities, SCA/3DS, health checks
-- **LLM Decision Engine**: Fine-tuned GPT-4 with tool calling and structured responses
- 
-// Vector Memory System removed in this variant
-- **Graceful Fallback**: Deterministic scoring when LLM is unavailable
+- **Fine-Tuned Model**: AI learns PSP patterns, fees, and capabilities from historical data
+- **Simplified Architecture**: No external providers needed - model learns everything
 - **Production Ready**: Structured logging, health checks, and monitoring
 
 ## ✨ Key Features
 
-### 🧠 **LLM-Powered Routing**
-- **Intelligent Decision Making**: Uses GPT-4 with structured JSON responses
+### 🧠 **Fine-Tuned Model Routing**
+- **Intelligent Decision Making**: Uses fine-tuned GPT model with structured JSON responses
 - **Context-Aware**: Considers transaction context, merchant preferences, and historical data
-- **Tool Integration**: Can call external APIs for real-time health and fee data
-- **Fallback Safety**: Graceful degradation to deterministic scoring when LLM is unavailable
-
-// Bandit learning and vector memory are not used in this architecture
+- **Learned Patterns**: Model learns PSP health, fees, and capabilities from training data
+- **No External Dependencies**: No need for real-time health/fee API calls
 
 ### 🏗️ **ASP.NET Core Web API Architecture**
 - **Enterprise-Grade Web API**: Built on ASP.NET Core for production deployment
@@ -46,12 +41,10 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
 │                    ASP.NET Core Web API                        │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │              Dependency Injection Container             │   │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │   │
-│  │  │   Health    │ │    Fees     │ │    Chat     │       │   │
-│  │  │  Provider   │ │  Provider   │ │   Client    │       │   │
-│  │  └─────────────┘ └─────────────┘ └─────────────┘       │   │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │   │
-│  │                                                     │   │
+│  │  ┌─────────────┐                                       │   │
+│  │  │    Chat     │                                       │   │
+│  │  │   Client    │                                       │   │
+│  │  └─────────────┘                                       │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -69,12 +62,15 @@ Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to max
                               │
                               ▼
                     ┌──────────────────┐
-                    │   LLM Engine     │
+                    │ Fine-Tuned Model │
                     │   (GPT-4)        │
                     └──────────────────┘
                               │
                               ▼
- 
+                    ┌──────────────────┐
+                    │  Historical Data │
+                    │   (Training)     │
+                    └──────────────────┘
 ```
 
 ## 📦 Project Layout
@@ -86,29 +82,37 @@ PspRouter/
 ├── PspRouter.Lib/           # Core business logic library
 ├── PspRouter.API/           # ASP.NET Core Web API
 ├── PspRouter.Tests/         # Unit tests
+├── PspRouter.Trainer/       # Fine-tuning service
 ├── PspRouter.sln           # Solution file
 ├── README.md               # Documentation
- 
+├── TODO.md                 # Implementation roadmap
+├── AI-ML-CONCEPTS.md       # AI/ML concepts documentation
 ```
 
 ### 📚 **PspRouter.Lib** (Core Library)
-- `Router.cs` – Decision engine (LLM first, fallback on parse/errors)
+- `Router.cs` – Decision engine using fine-tuned model
 - `DTOs.cs` – Data transfer objects and contracts
-- `Interfaces.cs` – Service abstractions and interfaces
-- `Tools.cs` – LLM tool implementations (`get_psp_health`, `get_fee_quote`)
-- `OpenAIChatClient.cs` – Chat wrapper with `response_format=json_object` and tool-calling loop
-- `PspRouter.Lib.csproj` – .NET 8 library with core dependencies (`OpenAI`, `Microsoft.Extensions.Logging.Abstractions`)
+- `Interfaces.cs` – Service abstractions (IChatClient only)
+- `OpenAIChatClient.cs` – Chat wrapper with `response_format=json_object` for fine-tuned model
+- `PspRouter.Lib.csproj` – .NET 8 library with minimal dependencies (`Microsoft.Extensions.Logging.Abstractions`)
 
 ### 🚀 **PspRouter.API** (ASP.NET Core Web API)
 - `Program.cs` – **ASP.NET Core** application with dependency injection, configuration, and service registration
 - `Controllers/RoutingController.cs` – REST API endpoints for routing transactions
-- `Dummies.cs` – Mock implementations for local testing and development
+- `Dummies.cs` – Mock implementations for local testing and development (DummyChatClient only)
 - `appsettings.json` – Configuration file with logging and PSP router settings
 - `PspRouter.API.csproj` – .NET 8 Web API with ASP.NET Core dependencies (`Microsoft.AspNetCore.OpenApi`, `Swashbuckle.AspNetCore`, etc.)
 
+### 🎓 **PspRouter.Trainer** (Fine-Tuning Service)
+- `Program.cs` – Console application for training fine-tuned models
+- `TrainingService.cs` – OpenAI fine-tuning workflow implementation
+- `TrainingDataProvider.cs` – Fetches training data from SQL Server database
+- `TrainingManager.cs` – Orchestrates the training process
+- `PspRouter.Trainer.csproj` – .NET 8 console application with training dependencies
+
 ### 🧪 **PspRouter.Tests** (Unit Tests)
-- `UnitTests.cs` – Unit test for core functionality (CapabilityProvider)
-- `IntegrationTests.cs` – Integration tests demonstrating routing flow
+- `UnitTests.cs` – Unit test for core functionality
+- `IntegrationTests.cs` – Integration tests demonstrating routing flow with fine-tuned model
 - `PspRouter.Tests.csproj` – .NET 8 test project with xUnit framework
 
 ### 🗄️ **Database & Configuration**
@@ -151,24 +155,18 @@ PspRouter/
 ### 🔄 PSP Router Decision Flow
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Transaction   │───▶│   Guardrails     │───▶│   LLM Router    │
-│   Request       │    │   (Compliance)   │    │   (Primary)     │
+│   Transaction   │───▶│   Fine-Tuned     │───▶│   Route         │
+│   Request       │    │   Model          │    │   Decision      │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                                                        │
-                                                        ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
- 
-│   Learning      │    │   Router         │    │   (Parse Error) │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-        │                        │
-        ▼                        ▼
-┌─────────────────┐    ┌──────────────────┐
-│   Update        │    │   Route          │
-│   Rewards       │    │   Decision       │
-└─────────────────┘    └──────────────────┘
+                                │
+                                ▼
+                    ┌──────────────────┐
+                    │  Historical Data │
+                    │   (Training)     │
+                    └──────────────────┘
 ```
 
-### 🧠 LLM Decision Process Flow
+### 🧠 Fine-Tuned Model Decision Process Flow
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Transaction   │───▶│   Build Context  │───▶│   System        │
@@ -177,37 +175,17 @@ PspRouter/
                                                         │
                                                         ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Tool Calls    │◀───│   LLM Analysis   │◀───│   Send to       │
-│   (Health/Fees) │    │   & Reasoning    │    │   OpenAI        │
+│   Learned       │◀───│   Fine-Tuned     │◀───│   Send to       │
+│   Patterns      │    │   Model Analysis │    │   OpenAI        │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
         │                        │
         ▼                        ▼
 ┌─────────────────┐    ┌──────────────────┐
-│   Real-time     │    │   Structured     │
-│   Data          │    │   JSON Response  │
+│   Historical    │    │   Structured     │
+│   Knowledge     │    │   JSON Response  │
 └─────────────────┘    └──────────────────┘
 ```
 
- 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Transaction   │───▶│   Extract        │───▶│   Calculate     │
-│   Context       │    │   Features       │    │   Scores        │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                                        │
-                                                        ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Update        │◀───│   Select Arm     │◀───│   Epsilon       │
-│   Statistics    │    │   (Exploit/      │    │   Decision      │
-│   & Features    │    │   Explore)       │    │   (Random?)     │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-        │                        │
-        ▼                        ▼
-┌─────────────────┐    ┌──────────────────┐
-│   Learning      │    │   PSP            │
-│   Progress      │    │   Selection      │
-└─────────────────┘    └──────────────────┘
-```
 
 
 
@@ -240,44 +218,32 @@ PspRouter/
           │
           ▼
 ┌─────────────────┐    ┌──────────────────┐
-│   Capability    │───▶│   Supported?     │
-│   Check         │    │   (Yes/No)       │
-└─────────────────┘    └─────────┬────────┘
-                                 │
-                                 ▼
-                    ┌─────────────────┐
-                    │   Health        │
-                    │   Check         │
-                    └─────────┬───────┘
-                              │
-                              ▼
-                    ┌─────────────────┐    ┌──────────────────┐
-                    │   LLM           │───▶│   Success?       │
-                    │   Decision      │    │   (Yes/No)       │
-                    └─────────────────┘    └─────────┬────────┘
-                                                     │
-                                                     ▼
-                                        ┌─────────────────┐
-                                        │   Bandit        │
-                                        │   Fallback      │
-                                        └─────────────────┘
+│   Fine-Tuned    │───▶│   Route          │
+│   Model         │    │   Decision       │
+└─────────────────┘    └──────────────────┘
+          │
+          ▼
+┌─────────────────┐
+│  Historical     │
+│  Knowledge      │
+│  (Training)     │
+└─────────────────┘
 ```
 
 ### 📊 Flow Diagram Summary
 
 - **🔄 PSP Router Decision Flow**: Shows the complete decision-making process from transaction request to final routing decision
-- **🧠 LLM Decision Process Flow**: Details how the LLM analyzes transactions and makes intelligent decisions
-- // Bandit Learning Flow not applicable in this variant
-- // Vector Memory Flow not applicable in this variant
+- **🧠 Fine-Tuned Model Decision Process Flow**: Details how the fine-tuned model analyzes transactions and makes intelligent decisions
 - **🔄 System Integration Flow**: Demonstrates the ASP.NET Core Web API architecture and dependency injection
-- **🎯 Decision Tree Flow**: Provides a high-level view of the decision logic and fallback mechanisms
+- **🎯 Decision Tree Flow**: Provides a high-level view of the simplified decision logic
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - .NET 8.0 SDK
-- // PostgreSQL with pgvector extension not required in this variant
-- OpenAI API key
+- OpenAI API key with fine-tuning access
+- SQL Server database with PaymentTransactions table
+- .env file with API keys and database connection
 
 ### 🏗️ **3-Project Architecture Benefits**
 This solution uses a clean 3-project architecture, providing:
@@ -313,6 +279,9 @@ dotnet test
 # Run the API
 dotnet run --project PspRouter.API
 
+# Run the trainer (for fine-tuning)
+dotnet run --project PspRouter.Trainer
+
 # Run with specific environment
 dotnet run --project PspRouter.API --environment Production
 
@@ -323,6 +292,7 @@ dotnet run --project PspRouter.API --configuration Release
 dotnet build PspRouter.Lib
 dotnet build PspRouter.API
 dotnet build PspRouter.Tests
+dotnet build PspRouter.Trainer
 
 # Run tests for specific project
 dotnet test PspRouter.Tests
@@ -356,13 +326,14 @@ Content-Type: application/json
     "merchantId": "M001",
     "country": "US",
     "region": "IL",
-    "currency": "USD",
+    "currencyId": 1,
     "amount": 150.00,
-    "method": "Card",
-    "scheme": "Visa",
+    "paymentMethodId": 1,
+    "paymentCardBin": "411111",
+    "threeDSTypeId": null,
+    "isTokenized": false,
     "scaRequired": false,
-    "riskScore": 15,
-    "bin": "411111"
+    "riskScore": 15
   },
   "candidates": [
     {
@@ -423,13 +394,14 @@ curl -X POST https://localhost:7000/api/routing/route \
       "merchantId": "M001",
       "country": "US",
       "region": "IL",
-      "currency": "USD",
+      "currencyId": 1,
       "amount": 150.00,
-      "method": "Card",
-      "scheme": "Visa",
+      "paymentMethodId": 1,
+      "paymentCardBin": "411111",
+      "threeDSTypeId": null,
+      "isTokenized": false,
       "scaRequired": false,
-      "riskScore": 15,
-      "bin": "411111"
+      "riskScore": 15
     },
     "candidates": [
       {
@@ -457,13 +429,14 @@ Invoke-RestMethod -Uri "https://localhost:7000/api/routing/route" -Method POST -
     "merchantId": "M001",
     "country": "US",
     "region": "IL", 
-    "currency": "USD",
+    "currencyId": 1,
     "amount": 150.00,
-    "method": "Card",
-    "scheme": "Visa",
+    "paymentMethodId": 1,
+    "paymentCardBin": "411111",
+    "threeDSTypeId": null,
+    "isTokenized": false,
     "scaRequired": false,
-    "riskScore": 15,
-    "bin": "411111"
+    "riskScore": 15
   },
   "candidates": [
     {
@@ -487,40 +460,29 @@ Invoke-RestMethod -Uri "https://localhost:7000/api/routing/health" -Method GET
 
 #### Basic Routing
 ```csharp
-var router = new PspRouter(chatClient, healthProvider, feeProvider, tools, logger);
-var decision = await router.DecideAsync(context, cancellationToken);
+var router = new PspRouter(chatClient, logger);
+var decision = await router.Decide(context, cancellationToken);
 ```
 
 ## 🔧 Configuration
 
-### LLM Configuration
+### Fine-Tuned Model Configuration
 ```csharp
-var chatClient = new OpenAIChatClient(apiKey, model: "gpt-4.1");
+var chatClient = new OpenAIChatClient(apiKey, model: "ft:gpt-3.5-turbo:your-org:psp-router:abc123");
 ```
 
 ## 📊 Decision Factors
 
-The system considers multiple factors in routing decisions:
+The fine-tuned model considers multiple factors learned from historical data:
 
 1. **Compliance** (SCA/3DS requirements)
-2. **Authorization Success Rates** (historical performance)
-3. **Fee Optimization** (minimize transaction costs)
-4. **Merchant Preferences** (configured preferences)
-5. **Historical Performance** (if provided by external stats)
-6. **Real-time Health** (PSP availability and latency)
-
-## 🎯 Reward Calculation
-
-The learning system uses a sophisticated reward function:
-
-```csharp
-reward = baseAuthReward - feePenalty + speedBonus - riskPenalty
-```
-
-- **Base Reward**: +1.0 for successful authorization, 0.0 for decline
-- **Fee Penalty**: Normalized fee amount as percentage of transaction
-- **Speed Bonus**: +0.1 for processing under 1 second
-- **Risk Penalty**: -0.2 for high-risk transactions (>50 risk score)
+2. **Authorization Success Rates** (learned from historical performance)
+3. **Fee Optimization** (learned from transaction outcomes)
+4. **Merchant Preferences** (learned from merchant patterns)
+5. **Historical Performance** (learned from training data)
+6. **PSP Capabilities** (learned from successful transaction patterns)
+7. **Payment Method Compatibility** (learned from BIN and method patterns)
+8. **Geographic Patterns** (learned from country/region success rates)
 
 
 ## 🛡 Security & Compliance
@@ -535,13 +497,14 @@ reward = baseAuthReward - feePenalty + speedBonus - riskPenalty
 - **Regulatory Compliance**: Built-in compliance checks
 - **Risk Management**: Integrated risk scoring
 
-## 🔄 Learning Loop
+## 🔄 Training Loop
 
-1. **Route Decision**: LLM selects PSP (with deterministic fallback)
-2. **Transaction Processing**: PSP processes payment
-3. **Outcome Capture**: Success/failure, fees, timing
-4. **Reward Calculation**: Multi-factor reward computation
-// No in-service learning in this variant
+1. **Data Collection**: Gather historical transaction data from PaymentTransactions table
+2. **Data Preparation**: Format data as JSONL training examples (RouteInput → RouteDecision)
+3. **Model Training**: Upload data to OpenAI and create fine-tuning job
+4. **Model Deployment**: Deploy fine-tuned model to production
+5. **Performance Monitoring**: Track model accuracy and routing success rates
+6. **Model Updates**: Retrain with new data as needed
 
 ## 🚀 Production Deployment
 
@@ -584,15 +547,15 @@ public async Task Learning_ShouldImproveOverTime()
 #### Core Classes
 
 ##### `PspRouter` (in `Router.cs`)
-Main routing engine with LLM and deterministic fallback.
+Main routing engine using fine-tuned model.
 
 ##### `OpenAIChatClient` (in `OpenAIChatClient.cs`)
-LLM integration with tool calling support.
+Fine-tuned model integration with structured JSON responses.
 
 #### Key Methods
 
-##### `DecideAsync(RouteContext, CancellationToken)`
-Makes routing decision using LLM or fallback logic.
+##### `Decide(RouteContext, CancellationToken)`
+Makes routing decision using fine-tuned model.
 
 ### 🚀 PspRouter.API (ASP.NET Core Web API)
 
@@ -602,25 +565,20 @@ ASP.NET Core application with dependency injection and service registration.
 #### `Controllers/RoutingController.cs`
 REST API controller with endpoint for routing transactions.
 
-#### `DummyHealthProvider` & `DummyFeeProvider`
-Mock implementations for local testing and development.
+#### `DummyChatClient`
+Mock implementation for local testing and development.
 
 ### 🧪 PspRouter.Tests (Unit Tests)
 
 #### `PspRouterTests`
 Test cases for core functionality including:
-- CapabilityMatrix validation
+- RouteInput structure validation
+- Fine-tuned model integration
 
 #### `IntegrationTests`
 Integration tests demonstrating complete routing flow:
-- End-to-end routing with LLM decision and deterministic fallback
+- End-to-end routing with fine-tuned model
 - Complete system integration testing
-
-#### `AddAsync(string, string, Dictionary, float[], CancellationToken)`
-Adds lesson to vector memory.
-
-#### `SearchAsync(float[], int, CancellationToken)`
-Searches vector memory for relevant lessons.
 
 
 ---
@@ -632,17 +590,19 @@ For detailed explanations of the AI/ML concepts used in this system, see:
 
 ---
 
-## 🎯 **3-Project Architecture Summary**
+## 🎯 **4-Project Architecture Summary**
 
-The PSP Router has been successfully restructured into a professional 3-project solution:
+The PSP Router has been successfully restructured into a professional 4-project solution:
 
 ### **✅ What We Achieved:**
-- **🏗️ Clean Architecture**: Separation of concerns with Library, Application, and Tests
+- **🏗️ Clean Architecture**: Separation of concerns with Library, Application, Tests, and Trainer
 - **📚 Reusable Library**: Core business logic can be used by other applications
 - **🧪 Comprehensive Testing**: Isolated unit tests for all core functionality
 - **🚀 Production Ready**: ASP.NET Core Web API with enterprise-grade hosting
+- **🎓 Training Ready**: Dedicated trainer service for fine-tuning models
 - **📦 Package Ready**: Library can be distributed as NuGet package
 - **🔧 Maintainable**: Easy to extend and modify individual components
+- **🤖 AI-Powered**: Fine-tuned model learns from historical data
 
 ### **🎯 Development Benefits:**
 - **Faster Development**: Work on library, app, and tests independently
@@ -658,10 +618,11 @@ The PSP Router has been successfully restructured into a professional 3-project 
 - **Scalability**: Scale application and library separately
 
 ### **📈 Next Steps:**
-1. **Package Library**: Create NuGet package for distribution
-2. **Add More Tests**: Expand test coverage for all components
-3. **Add Monitoring**: Integrate with Application Insights or Prometheus
-4. **Documentation**: Add XML documentation for public APIs
-5. **Authentication**: Add API authentication and authorization
+1. **Train Model**: Use PspRouter.Trainer to create fine-tuned model
+2. **Package Library**: Create NuGet package for distribution
+3. **Add More Tests**: Expand test coverage for all components
+4. **Add Monitoring**: Integrate with Application Insights or Prometheus
+5. **Documentation**: Add XML documentation for public APIs
+6. **Authentication**: Add API authentication and authorization
 
 ---

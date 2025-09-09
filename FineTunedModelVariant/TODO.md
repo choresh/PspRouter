@@ -1,30 +1,30 @@
 # 🚀 PSP Router - Implementation TODO List (Fine-Tuned Model Variant)
 
 ## 📋 Overview
-This document outlines all the components that need to be implemented or replaced to complete the PSP Router solution. The system is currently functional with dummy implementations and needs real data integrations for production use.
+This document outlines all the components that need to be implemented to complete the PSP Router solution. The system uses a **fine-tuned model approach** where the AI learns everything from historical transaction data.
 
 ---
 
 ## 📅 **Implementation Timeline & Next Stages**
 
 ### **📋 Implementation Priority Order**
-1. Core wiring: environment, DI, prompt/schema, timeouts/fallback
-2. Replace dummies: Health Provider, Fee Provider, Capability Provider
-3. Inputs & guardrails: capability matrix, PSP snapshots, preferences
+1. Environment configuration: OpenAI API key, fine-tuned model setup
+2. Training data preparation: collect and format historical transaction data
+3. Fine-tuning workflow: upload data, create job, monitor training
 4. Observability: logging, metrics, tracing; robust error handling
 5. Testing: integration and performance (latency + fallback)
 6. Deployment: containerization, CI/CD, config management
 7. Hardening: security, rate limiting, caching
 
 ### **⚠️ Critical Dependencies**
-- Environment configuration before real integrations
-- Health/Fee providers before production testing
+- Environment configuration before training
+- Historical transaction data before fine-tuning
 - Observability before production rollout
 
 ### **🔄 Sequential vs Parallel Tasks**
-**Sequential:** Core wiring → Providers → Observability → Testing → Deployment
+**Sequential:** Environment setup → Training data → Fine-tuning → Observability → Testing → Deployment
 
-**Parallel:** Health + Fee providers; Monitoring/Rate limiting/Caching once endpoints stable
+**Parallel:** Monitoring/Rate limiting/Caching once endpoints stable
 
 ### **🎯 Success Criteria**
 - P95 latency within SLA with deterministic fallback
@@ -37,234 +37,127 @@ This document outlines all the components that need to be implemented or replace
 
 ### 1. **Environment Configuration** ⚠️ **REQUIRED**
 - [ ] Set valid OPENAI_API_KEY at your 2 `.env` files
-- [ ] Verify OpenAI API key has sufficient credits and access to GPT-4
+- [ ] Verify OpenAI API key has sufficient credits and access to fine-tuning
+- [ ] Set database connection string `PSPROUTER_DB_CONNECTION` in `.env`
 
-#### LLM Setup
+#### Fine-Tuned Model Setup
 - [ ] Set fine-tuned model ID via `OPENAI_FT_MODEL` or `PspRouter:OpenAI:FineTunedModel`
 - [ ] Confirm strict `RouteDecision` JSON schema in `BuildSystemPrompt()`
-- [ ] (Optional) few-shot examples to reinforce reasoning style
 - [ ] Configure timeout/fallback (e.g., 800–1200 ms) and strict JSON validation
-- [ ] Ensure tools for health/fees are active
 - [ ] Observability: latency, tokens, fallback rate, schema errors
 - [ ] Tests: unit (schema/fallback), integration (end-to-end), performance (P95)
 
-#### Fine-tuning workflow (optional but recommended)
-- [ ] Data prep: collect de-PII’d labeled decisions (inputs → `RouteDecision`)
-- [ ] Upload training file (API: Files.Upload)
-- [ ] Create fine-tune job (API: FineTuning.CreateJob)
-- [ ] Track job and retrieve model id (API: FineTuning.GetJob)
-- [ ] Offline eval against holdout; fix errors; iterate
-- [ ] Shadow/A-B test in staging; then production rollout with monitoring
+#### Fine-tuning workflow (REQUIRED for production)
+- [ ] **Data prep**: collect de-PII'd labeled decisions from `PaymentTransactions` table
+- [ ] **Training data**: format as JSONL with `RouteInput` → `RouteDecision` pairs
+- [ ] **Upload training file**: use `TrainingService.UploadFileToOpenAIAsync()`
+- [ ] **Create fine-tune job**: use `TrainingService.CreateFineTuningJobViaHttpAsync()`
+- [ ] **Monitor training**: use `TrainingService.GetFineTuningJobDetailsAsync()`
+- [ ] **Offline eval**: test against holdout data; fix errors; iterate
+- [ ] **Production rollout**: shadow/A-B test in staging; then production with monitoring
 
 ---
 
-## 🔧 **Phase 2: Replace Dummy Implementations**
+## 🏗️ **Phase 2: Production Features**
 
-### 2. **Health Provider Implementation** ❌ **DUMMY**
-**File:** `PspRouter.API/Dummies.cs` (lines 5-11)
-
-**Current:** Returns hardcoded "green" health status
-
-**Replace with:**
-```csharp
-public class RealHealthProvider : IHealthProvider
-{
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<RealHealthProvider> _logger;
-
-    public async Task<(string health, int latencyMs)> GetAsync(string psp, CancellationToken ct)
-    {
-        // TODO: Implement real PSP health checks
-        // - Adyen: https://status.adyen.com/api
-        // - Stripe: https://status.stripe.com/api
-        // - PayPal: https://www.paypal-status.com/api
-        // - Klarna: https://status.klarna.com/api
-        
-        // Implementation example:
-        // var response = await _httpClient.GetAsync($"/api/health/{psp}", ct);
-        // var healthData = await response.Content.ReadFromJsonAsync<HealthResponse>();
-        // return (healthData.Status, healthData.LatencyMs);
-        
-        throw new NotImplementedException("Real health provider not implemented");
-    }
-}
-```
-
-### 3. **Fee Provider Implementation** ❌ **DUMMY**
-**File:** `PspRouter.API/Dummies.cs` (lines 13-19)
-
-**Current:** Returns hardcoded 200 bps + $0.30 fees
-
-**Replace with:**
-```csharp
-public class RealFeeProvider : IFeeQuoteProvider
-{
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<RealFeeProvider> _logger;
-
-    public async Task<(int feeBps, decimal fixedFee)> GetAsync(string psp, RouteInput tx, CancellationToken ct)
-    {
-        // TODO: Implement real PSP fee calculations
-        // - Adyen: https://docs.adyen.com/api-explorer/#/CheckoutService/v68/post/paymentMethods
-        // - Stripe: https://stripe.com/docs/api/prices
-        // - PayPal: https://developer.paypal.com/docs/api/orders/v2/
-        // - Klarna: https://developers.klarna.com/api/reference/
-        
-        // Implementation example:
-        // var feeRequest = new FeeRequest(tx.Currency, tx.Amount, tx.Method);
-        // var response = await _httpClient.PostAsJsonAsync($"/api/fees/{psp}", feeRequest, ct);
-        // var feeData = await response.Content.ReadFromJsonAsync<FeeResponse>();
-        // return (feeData.BasisPoints, feeData.FixedFee);
-        
-        throw new NotImplementedException("Real fee provider not implemented");
-    }
-}
-```
-
-### 4. **Capability Provider Implementation** ❌ **DUMMY**
-**File:** `PspRouter.API/Dummies.cs` (lines 31-40)
-
-**Current:** Returns hardcoded results
-
-**Replace with:**
-```csharp
-public class RealCapabilityProvider : ICapabilityProvider
-{
-    // TODO: Load capability rules from configuration at startup (per PSP)
-    // - AllowedMethods: Card, PayPal, KlarnaPayLater
-    // - AllowedSchemes (for Card): Visa, Mastercard, Amex
-    // - Supports3DS / Requires3DS flags
-    // - Optional allowlists: MerchantCountries, Currencies
-    // Pseudocode:
-    // private readonly CapabilityConfig _config;
-    // public RealCapabilityProvider(CapabilityConfig config) { _config = config; }
-    // public bool Supports(string psp, RouteInput tx) {
-    //   if (!_config.Providers.TryGetValue(psp, out var p)) return false;
-    //   if (!p.AllowedMethods.Contains(tx.Method)) return false;
-    //   if (tx.Method == PaymentMethod.Card && p.AllowedSchemes?.Count > 0 && !p.AllowedSchemes.Contains(tx.Scheme)) return false;
-    //   if (tx.Method == PaymentMethod.Card && tx.SCARequired && p.Requires3DS && p.Supports3DS == false) return false;
-    //   if (p.AllowedMerchantCountries?.Count > 0 && !p.AllowedMerchantCountries.Contains(tx.MerchantCountry)) return false;
-    //   if (p.AllowedCurrencies?.Count > 0 && !p.AllowedCurrencies.Contains(tx.Currency)) return false;
-    //   return true;
-    // }
-
-      throw new NotImplementedException("Real capability provider not implemented");
-}
-```
-
-### 5. **Update Service Registration** ⚠️ **REQUIRED**
-**File:** `PspRouter.API/Program.cs` (lines 53-54)
-
-**Replace:**
-```csharp
-// ❌ CURRENT (DUMMY):
-builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.DummyCapabilityProvider>();
-builder.Services.AddSingleton<IHealthProvider, PspRouter.API.DummyHealthProvider>();
-builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.DummyFeeProvider>();
-
-// ✅ REPLACE WITH:
-builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.RealCapabilityProvider>();
-builder.Services.AddSingleton<IHealthProvider, PspRouter.API.RealHealthProvider>();
-builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>();
-```
-
----
-
-## 🏗️ **Phase 4: Production Features**
-
-### 6. **Monitoring & Observability** ❌ **BASIC**
+### 1. **Monitoring & Observability** ❌ **BASIC**
 - [ ] Add structured logging with correlation IDs
-- [ ] Implement health check endpoints for all PSPs
-- [ ] Add metrics collection (authorization rates, response times)
-- [ ] Set up alerting for PSP failures
-- [ ] Add distributed tracing
+- [ ] Add metrics collection (authorization rates, response times, model performance)
+- [ ] Set up alerting for model failures and routing errors
+- [ ] Add distributed tracing for fine-tuned model calls
+- [ ] Monitor fine-tuned model performance and accuracy
 
-### 7. **Caching Layer** ❌ **MISSING**
-- [ ] Implement Redis caching for PSP health status
-- [ ] Cache fee calculations with TTL
-- [ ] Cache merchant preferences
+### 2. **Caching Layer** ❌ **MISSING**
+- [ ] Implement Redis caching for model responses
+- [ ] Cache merchant preferences and routing patterns
 - [ ] Implement cache invalidation strategies
+- [ ] Cache training data for model updates
 
-### 8. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
+### 3. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
 - [ ] Add rate limiting for API endpoints
-- [ ] Implement circuit breakers for PSP calls
+- [ ] Implement circuit breakers for OpenAI API calls
 - [ ] Add retry policies with exponential backoff
-- [ ] Implement bulkhead pattern for PSP isolation
+- [ ] Implement fallback routing when model is unavailable
 
-### 9. **Security Enhancements** ⚠️ **BASIC**
+### 4. **Security Enhancements** ⚠️ **BASIC**
 - [ ] Add API authentication/authorization
 - [ ] Implement request/response encryption
 - [ ] Add input validation and sanitization
 - [ ] Implement audit logging for compliance
+- [ ] Secure OpenAI API key management
 
 ---
 
-## 🧪 **Phase 5: Testing & Quality**
+## 🧪 **Phase 3: Testing & Quality**
 
-### 10. **Integration Tests** ⚠️ **PARTIAL**
+### 1. **Integration Tests** ⚠️ **PARTIAL**
 **File:** `PspRouter.Tests/IntegrationTests.cs`
 
-**Current:** Uses dummy implementations
+**Current:** Uses simplified architecture with DummyChatClient
 
 **Enhance with:**
-- [ ] Real PSP API integration tests (with test accounts) 
-- [ ] End-to-end routing flow tests
+- [ ] Fine-tuned model integration tests
+- [ ] End-to-end routing flow tests with real model
+- [ ] Training data validation tests
 
-### 11. **Performance Testing** ❌ **MISSING**
+### 2. **Performance Testing** ❌ **MISSING**
 - [ ] Load testing for routing decisions
 - [ ] Stress testing for concurrent requests
 - [ ] Memory usage profiling
- 
+- [ ] Model response time testing
 
-### 12. **Data Quality Tests** ❌ **MISSING**
-- [ ] PSP data validation tests
-- [ ] Fee calculation accuracy tests
-- [ ] Health status consistency tests
+### 3. **Data Quality Tests** ❌ **MISSING**
+- [ ] Training data validation tests
+- [ ] Model accuracy validation tests
+- [ ] RouteDecision schema validation tests
+- [ ] Historical data quality checks
  
-
 ---
 
-## 🔄 **Phase 6: Deployment & Operations**
+## 🔄 **Phase 4: Deployment & Operations**
 
-### 13. **Containerization** ❌ **MISSING**
+### 1. **Containerization** ❌ **MISSING**
 - [ ] Create Dockerfile for API
- 
 - [ ] Add health checks to containers
 - [ ] Configure multi-stage builds
+- [ ] Add training service containerization
 
-### 14. **CI/CD Pipeline** ❌ **MISSING**
+### 2. **CI/CD Pipeline** ❌ **MISSING**
 - [ ] Set up automated testing pipeline
 - [ ] Add code quality checks (SonarQube)
 - [ ] Implement automated deployment
 - [ ] Add rollback capabilities
+- [ ] Automated model training pipeline
 
-### 15. **Configuration Management** ⚠️ **BASIC**
+### 3. **Configuration Management** ⚠️ **BASIC**
 - [ ] Implement configuration validation
 - [ ] Add environment-specific configs
 - [ ] Implement feature flags
 - [ ] Add configuration hot-reloading
+- [ ] Secure .env file management
 
 ---
 
-## 📈 **Phase 7: Advanced Features**
+## 📈 **Phase 5: Advanced Features**
 
-### 16. **Machine Learning Enhancements** ❌ **BASIC**
-- [ ] Implement A/B testing framework
-- [ ] Add model performance monitoring
-- [ ] Implement online learning for bandits
-- [ ] Add feature engineering pipeline
+### 1. **Machine Learning Enhancements** ❌ **BASIC**
+- [ ] Implement A/B testing framework for model versions
+- [ ] Add model performance monitoring and drift detection
+- [ ] Implement continuous learning from new transaction data
+- [ ] Add feature engineering pipeline for training data
 
-### 17. **Analytics & Reporting** ❌ **MISSING**
+### 2. **Analytics & Reporting** ❌ **MISSING**
 - [ ] Implement routing decision analytics
-- [ ] Add PSP performance dashboards
+- [ ] Add model performance dashboards
 - [ ] Create merchant-specific reports
 - [ ] Implement cost optimization insights
+- [ ] Model accuracy and confidence metrics
 
-### 18. **Multi-Region Support** ❌ **MISSING**
+### 3. **Multi-Region Support** ❌ **MISSING**
 - [ ] Implement geographic routing
-- [ ] Add region-specific PSP preferences
+- [ ] Add region-specific model training
 - [ ] Implement data residency compliance
-- [ ] Add cross-region failover
+- [ ] Add cross-region model deployment
 
 ---
 
@@ -279,13 +172,14 @@ builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>(
 ### **Dependencies:**
 - Phase 1 must be completed before Phase 2
 - Phase 2 must be completed before Phase 3
-- Phases 4-7 can be implemented in parallel
+- Phases 4-5 can be implemented in parallel
 
 ### **Testing Strategy:**
-- Unit tests for each new implementation
-- Integration tests with real PSP APIs (test accounts)
+- Unit tests for fine-tuned model integration
+- Integration tests with real model responses
 - End-to-end tests for complete routing flow
 - Performance tests for production readiness
+- Model accuracy and validation tests
 
 ---
 
@@ -305,24 +199,25 @@ builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>(
 ---
 
 **Last Updated:** December 2024
-**Status:** Ready for implementation
-**Estimated Total Effort:** 4-6 weeks for core functionality, 8-12 weeks for full production system
+**Status:** ✅ Architecture simplified, ready for fine-tuning and training
+**Estimated Total Effort:** 2-3 weeks for training and deployment, 4-6 weeks for full production system
 
 ---
 
 ## 🛠 **Implementation Tasks & Guidance**
 
-### **🔄 Replace Dummy Implementations**
-- [ ] Implement `IHealthProvider` and `IFeeQuoteProvider` with your metrics/config
-- [ ] Swap in your own stats for `AuthRate30d` and pass them in `RouteContext`
-- [ ] Replace `DummyHealthProvider` and `DummyFeeProvider` with real implementations
-- [ ] Update service registration in `Program.cs`
+### **🔄 Fine-Tuned Model Setup**
+- [ ] ✅ **COMPLETED**: Architecture simplified (removed all external providers)
+- [ ] Set up OpenAI API key and fine-tuned model configuration
+- [ ] Prepare training data from `PaymentTransactions` table
+- [ ] Run training workflow using `PspRouter.Trainer` project
+- [ ] Deploy fine-tuned model to production
 
 ### **🔧 System Tuning & Configuration**
-- [ ] Adjust embedding model & `vector(N)` dimension in `MemoryPgVector.cs` to match your chosen model
-- [ ] Configure model name in `OpenAIChatClient` (default: `gpt-4.1`)
-- [ ] Tune bandit epsilon values for optimal exploration/exploitation balance
+- [ ] Configure fine-tuned model name in `OpenAIChatClient` (set via `OPENAI_FT_MODEL`)
+- [ ] Tune model temperature and response format for optimal routing decisions
 - [ ] Configure logging levels for production vs development environments
+- [ ] Set up database connection for training data access
 
 ### **📊 Monitoring & Observability Setup**
 
@@ -333,16 +228,16 @@ builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>(
 - [ ] **Debug**: Detailed decision reasoning, memory operations
 
 #### **Key Metrics to Track**
-- [ ] **Authorization Success Rate**: Per PSP, per segment
-- [ ] **Average Processing Time**: Response time optimization
-- [ ] **Fee Optimization**: Cost reduction over time
-- [ ] **Learning Convergence**: Bandit algorithm performance
+- [ ] **Model Accuracy**: Routing decision correctness
+- [ ] **Average Processing Time**: Model response time optimization
+- [ ] **Cost Optimization**: Fee reduction over time
+- [ ] **Model Performance**: Success rates and confidence scores
 
 #### **Monitoring Setup**
 - [ ] Set up Application Insights or Prometheus integration
-- [ ] Configure alerting for critical failures
-- [ ] Implement health check endpoints for all PSPs
-- [ ] Set up performance dashboards
+- [ ] Configure alerting for model failures and routing errors
+- [ ] Implement health check endpoints for the routing service
+- [ ] Set up performance dashboards for model metrics
 
 ### **📦 Packaging & Distribution**
 
@@ -361,20 +256,20 @@ builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.RealFeeProvider>(
 - [ ] **ASP.NET Core Web API Integration**
   ```csharp
   services.AddScoped<PspRouter.Lib.PspRouter>();
-  services.AddSingleton<ICapabilityProvider, YourCapabilityProvider>();
-  services.AddSingleton<IHealthProvider, YourHealthProvider>();
-  services.AddSingleton<IFeeQuoteProvider, YourFeeProvider>();
+  services.AddSingleton<IChatClient, OpenAIChatClient>();
   ```
 - [ ] **Azure Functions Integration**
 - [ ] **Console Application Integration**
 
 #### **Library Dependencies**
 The library has minimal external dependencies:
-- `OpenAI` - OpenAI API client  
 - `Microsoft.Extensions.Logging.Abstractions` - Logging interfaces
+- Direct HTTP calls to OpenAI API (no external SDK)
 
 ### **🔧 Customization & Extensions**
 
  
 #### **Adding New PSPs**
-- [ ] Implement/update health, capability and fee providers
+- [ ] Add new PSP data to training dataset
+- [ ] Retrain fine-tuned model with expanded data
+- [ ] Update PSP candidate lists in routing logic
