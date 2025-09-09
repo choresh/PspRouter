@@ -15,7 +15,7 @@ public interface IPspCandidateProvider
 }
 
 /// <summary>
-/// In-memory PSP candidate provider with performance tracking
+/// In-memory PSP candidate provider with performance tracking and ML enhancement
 /// </summary>
 public class PspCandidateProvider : IPspCandidateProvider
 {
@@ -23,45 +23,111 @@ public class PspCandidateProvider : IPspCandidateProvider
     private readonly Dictionary<string, PspCandidate> _candidates;
     private readonly object _lock = new object();
     private readonly PspCandidateSettings _settings;
+    private readonly IPspPerformancePredictor? _performancePredictor;
+    private readonly IMLModelRetrainingService? _retrainingService;
 
-    public PspCandidateProvider(ILogger<PspCandidateProvider> logger, PspCandidateSettings settings)
+    public PspCandidateProvider(ILogger<PspCandidateProvider> logger, PspCandidateSettings settings, IPspPerformancePredictor? performancePredictor = null, IMLModelRetrainingService? retrainingService = null)
     {
         _logger = logger;
         _settings = settings;
+        _performancePredictor = performancePredictor;
+        _retrainingService = retrainingService;
         _candidates = LoadCandidatesFromDatabase();
     }
 
-    public Task<IReadOnlyList<PspSnapshot>> GetCandidates(RouteInput transaction, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PspSnapshot>> GetCandidates(RouteInput transaction, CancellationToken cancellationToken = default)
     {
+        // 1. Get base candidates from database (inside lock)
+        List<PspCandidate> baseCandidates;
         lock (_lock)
         {
             var allowedHealth = new[] { "green", "yellow" };
             
-            var candidates = _candidates.Values
+            baseCandidates = _candidates.Values
                 .Where(c => c.Supports)
                 .Where(c => allowedHealth.Contains(c.Health, StringComparer.OrdinalIgnoreCase))
                 .Where(c => !(transaction.SCARequired && transaction.PaymentMethodId == 1 && !c.Supports3DS)) // PaymentMethodId 1 = Card
-                .Select(c => new PspSnapshot(
-                    c.Name,
-                    c.Supports,
-                    c.Health,
-                    c.CurrentAuthRate, // Use current performance-based auth rate
-                    c.FeeBps,
-                    c.FixedFee,
-                    c.Supports3DS,
-                    c.Tokenization
-                ))
                 .ToList();
+        }
 
-            _logger.LogInformation("Retrieved {Count} valid PSP candidates for transaction {MerchantId}", 
+        // 2. Enhance with ML predictions if available (outside lock to allow await)
+        if (_performancePredictor != null)
+        {
+            var enhancedCandidates = new List<PspSnapshot>();
+            
+            foreach (var candidate in baseCandidates)
+            {
+                try
+                {
+                    // Get ML predictions for this PSP
+                    var successRate = await _performancePredictor.PredictSuccessRate(candidate.Name, transaction, cancellationToken);
+                    var processingTime = await _performancePredictor.PredictProcessingTime(candidate.Name, transaction, cancellationToken);
+                    var mlHealth = await _performancePredictor.PredictHealthStatus(candidate.Name, cancellationToken);
+                    
+                    // Use ML predictions if they're better than historical data
+                    var finalAuthRate = Math.Max(successRate, candidate.CurrentAuthRate);
+                    
+                    enhancedCandidates.Add(new PspSnapshot(
+                        candidate.Name,
+                        candidate.Supports,
+                        mlHealth, // Use ML-based health
+                        finalAuthRate, // Use ML-enhanced auth rate
+                        candidate.FeeBps,
+                        candidate.FixedFee,
+                        candidate.Supports3DS,
+                        candidate.Tokenization
+                    ));
+                    
+                    _logger.LogDebug("Enhanced PSP {PspName} with ML predictions: Success={SuccessRate:P2}, Health={Health}", 
+                        candidate.Name, successRate, mlHealth);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to get ML predictions for PSP {PspName}, using historical data", candidate.Name);
+                    
+                    // Fallback to historical data
+                    enhancedCandidates.Add(new PspSnapshot(
+                        candidate.Name,
+                        candidate.Supports,
+                        candidate.Health,
+                        candidate.CurrentAuthRate,
+                        candidate.FeeBps,
+                        candidate.FixedFee,
+                        candidate.Supports3DS,
+                        candidate.Tokenization
+                    ));
+                }
+            }
+            
+            _logger.LogInformation("Retrieved {Count} ML-enhanced PSP candidates for transaction {MerchantId}", 
+                enhancedCandidates.Count, transaction.MerchantId);
+            
+            return enhancedCandidates;
+        }
+        else
+        {
+            // No ML predictor available, use historical data
+            var candidates = baseCandidates.Select(c => new PspSnapshot(
+                c.Name,
+                c.Supports,
+                c.Health,
+                c.CurrentAuthRate,
+                c.FeeBps,
+                c.FixedFee,
+                c.Supports3DS,
+                c.Tokenization
+            )).ToList();
+
+            _logger.LogInformation("Retrieved {Count} PSP candidates (historical data only) for transaction {MerchantId}", 
                 candidates.Count, transaction.MerchantId);
 
-            return Task.FromResult<IReadOnlyList<PspSnapshot>>(candidates);
+            return candidates;
         }
     }
 
-    public Task ProcessFeedback(TransactionFeedback feedback, CancellationToken cancellationToken = default)
+    public async Task ProcessFeedback(TransactionFeedback feedback, CancellationToken cancellationToken = default)
     {
+        // 1. Update in-memory candidate data (inside lock)
         lock (_lock)
         {
             if (_candidates.TryGetValue(feedback.PspName, out var candidate))
@@ -84,7 +150,52 @@ public class PspCandidateProvider : IPspCandidateProvider
             }
         }
 
-        return Task.CompletedTask;
+        // 2. Update ML models with feedback (outside lock to allow await)
+        if (_performancePredictor != null)
+        {
+            try
+            {
+                await _performancePredictor.UpdateWithFeedback(feedback, cancellationToken);
+                _logger.LogDebug("Updated ML models with feedback for PSP {PspName}", feedback.PspName);
+                
+                // 3. Check if models need retraining and do it asynchronously
+                if (_retrainingService != null && _retrainingService.ShouldRetrainModels())
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _retrainingService.RetrainPspModelAsync(feedback.PspName, cancellationToken);
+                            _logger.LogInformation("ML models retrained with real data after feedback from PSP {PspName}", feedback.PspName);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to retrain ML models after feedback from PSP {PspName}", feedback.PspName);
+                        }
+                    }, cancellationToken);
+                }
+                else if (_performancePredictor.ShouldRetrain())
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _performancePredictor.RetrainIncremental(cancellationToken);
+                            _logger.LogInformation("ML models updated incrementally after feedback from PSP {PspName}", feedback.PspName);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to update ML models after feedback from PSP {PspName}", feedback.PspName);
+                        }
+                    }, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to update ML models with feedback for PSP {PspName}", feedback.PspName);
+                // Don't throw - in-memory update was successful, ML update is optional
+            }
+        }
     }
 
     public Task<IReadOnlyList<PspCandidate>> GetAllCandidates(CancellationToken cancellationToken = default)
@@ -168,8 +279,8 @@ public class PspCandidateProvider : IPspCandidateProvider
                 var name = reader.GetString(1);
                 var totalTransactions = reader.GetInt32(2);
                 var successfulTransactions = reader.GetInt32(3);
-                var authRate = reader.GetDouble(4);
-                var avgProcessingTime = reader.IsDBNull(5) ? 2000.0 : reader.GetDouble(5);
+                var authRate = Convert.ToDouble(reader.GetValue(4));
+                var avgProcessingTime = reader.IsDBNull(5) ? 2000.0 : Convert.ToDouble(reader.GetValue(5));
                 var supportsTokenization = reader.GetInt32(6) == 1;
                 var supports3DS = reader.GetInt32(7) == 1;
                 var healthStatus = reader.GetString(8);
