@@ -3,5 +3,6 @@
 // Training service interface for ML-based training
 public interface ITrainingService
 {
-    Task TrainModel(CancellationToken cancellationToken = default);
+    Task TrainPspSelectionModel(CancellationToken cancellationToken = default);
+    Task TrainPspPerformanceModels(CancellationToken cancellationToken = default);
 }

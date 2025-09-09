@@ -4,68 +4,109 @@ using Microsoft.Data.SqlClient;
 namespace PspRouter.Lib;
 
 /// <summary>
-/// Service for managing PSP candidates with performance tracking and learning
+/// ML-enhanced PSP candidate provider with intelligent performance prediction
 /// </summary>
-public interface IPspCandidateProvider
+public class MLEnhancedPspCandidateProvider : IPspCandidateProvider
 {
-    Task<IReadOnlyList<PspSnapshot>> GetCandidates(RouteInput transaction, CancellationToken cancellationToken = default);
-    Task ProcessFeedback(TransactionFeedback feedback, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<PspCandidate>> GetAllCandidates(CancellationToken cancellationToken = default);
-    Task<PspCandidate?> GetCandidate(string pspName, CancellationToken cancellationToken = default);
-}
-
-/// <summary>
-/// In-memory PSP candidate provider with performance tracking
-/// </summary>
-public class PspCandidateProvider : IPspCandidateProvider
-{
-    private readonly ILogger<PspCandidateProvider> _logger;
+    private readonly ILogger<MLEnhancedPspCandidateProvider> _logger;
     private readonly Dictionary<string, PspCandidate> _candidates;
     private readonly object _lock = new object();
     private readonly PspCandidateSettings _settings;
+    private readonly IPspPerformancePredictor _performancePredictor;
 
-    public PspCandidateProvider(ILogger<PspCandidateProvider> logger, PspCandidateSettings settings)
+    public MLEnhancedPspCandidateProvider(
+        ILogger<MLEnhancedPspCandidateProvider> logger, 
+        PspCandidateSettings settings,
+        IPspPerformancePredictor performancePredictor)
     {
         _logger = logger;
         _settings = settings;
+        _performancePredictor = performancePredictor;
         _candidates = LoadCandidatesFromDatabase();
     }
 
-    public Task<IReadOnlyList<PspSnapshot>> GetCandidates(RouteInput transaction, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PspSnapshot>> GetCandidates(RouteInput transaction, CancellationToken cancellationToken = default)
     {
+        // 1. Get base candidates from database (inside lock)
+        List<PspCandidate> baseCandidates;
         lock (_lock)
         {
             var allowedHealth = new[] { "green", "yellow" };
             
-            var candidates = _candidates.Values
+            baseCandidates = _candidates.Values
                 .Where(c => c.Supports)
                 .Where(c => allowedHealth.Contains(c.Health, StringComparer.OrdinalIgnoreCase))
-                .Where(c => !(transaction.SCARequired && transaction.PaymentMethodId == 1 && !c.Supports3DS)) // PaymentMethodId 1 = Card
-                .Select(c => new PspSnapshot(
-                    c.Name,
-                    c.Supports,
-                    c.Health,
-                    c.CurrentAuthRate, // Use current performance-based auth rate
-                    c.FeeBps,
-                    c.FixedFee,
-                    c.Supports3DS,
-                    c.Tokenization
-                ))
+                .Where(c => !(transaction.SCARequired && transaction.PaymentMethodId == 1 && !c.Supports3DS))
                 .ToList();
-
-            _logger.LogInformation("Retrieved {Count} valid PSP candidates for transaction {MerchantId}", 
-                candidates.Count, transaction.MerchantId);
-
-            return Task.FromResult<IReadOnlyList<PspSnapshot>>(candidates);
         }
+
+        // 2. Enhance with ML predictions (outside lock to allow await)
+        var enhancedCandidates = new List<PspSnapshot>();
+        
+        foreach (var candidate in baseCandidates)
+        {
+            try
+            {
+                // Get ML-predicted performance metrics
+                var predictedSuccessRate = await _performancePredictor.PredictSuccessRate(
+                    candidate.Name, transaction, cancellationToken);
+                var predictedProcessingTime = await _performancePredictor.PredictProcessingTime(
+                    candidate.Name, transaction, cancellationToken);
+                var predictedHealth = await _performancePredictor.PredictHealthStatus(
+                    candidate.Name, cancellationToken);
+
+                // Create enhanced snapshot with ML predictions
+                var enhancedSnapshot = new PspSnapshot(
+                    candidate.Name,
+                    candidate.Supports,
+                    predictedHealth, // Use ML-predicted health
+                    predictedSuccessRate, // Use ML-predicted success rate
+                    candidate.FeeBps,
+                    candidate.FixedFee,
+                    candidate.Supports3DS,
+                    candidate.Tokenization
+                );
+
+                enhancedCandidates.Add(enhancedSnapshot);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to get ML predictions for PSP {PspName}, using base metrics", candidate.Name);
+                
+                // Fallback to base candidate if ML prediction fails
+                var fallbackSnapshot = new PspSnapshot(
+                    candidate.Name,
+                    candidate.Supports,
+                    candidate.Health,
+                    candidate.CurrentAuthRate,
+                    candidate.FeeBps,
+                    candidate.FixedFee,
+                    candidate.Supports3DS,
+                    candidate.Tokenization
+                );
+                
+                enhancedCandidates.Add(fallbackSnapshot);
+            }
+        }
+
+        // 3. Sort by ML-predicted success rate (descending)
+        var sortedCandidates = enhancedCandidates
+            .OrderByDescending(c => c.AuthRate30d) // This now contains ML-predicted success rate
+            .ToList();
+
+        _logger.LogInformation("Retrieved {Count} ML-enhanced PSP candidates for transaction {MerchantId}", 
+            sortedCandidates.Count, transaction.MerchantId);
+
+        return sortedCandidates;
     }
 
-    public Task ProcessFeedback(TransactionFeedback feedback, CancellationToken cancellationToken = default)
+    public async Task ProcessFeedback(TransactionFeedback feedback, CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
             if (_candidates.TryGetValue(feedback.PspName, out var candidate))
             {
+                // 1. Update traditional performance metrics
                 var updatedCandidate = candidate.WithPerformanceUpdate(
                     feedback.Authorized,
                     feedback.ProcessingTimeMs,
@@ -84,7 +125,32 @@ public class PspCandidateProvider : IPspCandidateProvider
             }
         }
 
-        return Task.CompletedTask;
+        // 2. Update ML models with new feedback
+        try
+        {
+            await _performancePredictor.UpdateWithFeedback(feedback, cancellationToken);
+            
+            // 3. Check if models need retraining
+            if (_performancePredictor.ShouldRetrain())
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _performancePredictor.RetrainIncremental(cancellationToken);
+                        _logger.LogInformation("ML models retrained incrementally");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to retrain ML models");
+                    }
+                }, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update ML models with feedback for PSP {PspName}", feedback.PspName);
+        }
     }
 
     public Task<IReadOnlyList<PspCandidate>> GetAllCandidates(CancellationToken cancellationToken = default)
@@ -222,7 +288,6 @@ public class PspCandidateProvider : IPspCandidateProvider
     private long GetPaymentMethodIdFromFeedback(TransactionFeedback feedback)
     {
         // TODO: Implement this
-
         // In a real implementation, this would be extracted from the feedback
         // For now, we'll use a default value or extract from transaction context
         return 1; // Default to card payment method

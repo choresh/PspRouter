@@ -25,14 +25,14 @@ public class PredictionService : IPredictionService
     /// <summary>
     /// Load the trained ML model
     /// </summary>
-    public async Task LoadModel(CancellationToken cancellationToken = default)
+    public Task LoadModel(CancellationToken cancellationToken = default)
     {
         try
         {
             if (!File.Exists(_modelPath))
             {
                 _logger.LogError("ML model file not found at path: {ModelPath}", _modelPath);
-                return;
+                return Task.CompletedTask;
             }
 
             _model = _mlContext.Model.Load(_modelPath, out var modelSchema);
@@ -43,17 +43,19 @@ public class PredictionService : IPredictionService
             _logger.LogError(ex, "Failed to load ML model from {ModelPath}", _modelPath);
             _model = null;
         }
+        
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// Predict the best PSP for the given routing context
     /// </summary>
-    public async Task<MLRoutingPrediction?> PredictBestPsp(RouteContext context, CancellationToken cancellationToken = default)
+    public Task<MLRoutingPrediction?> PredictBestPsp(RouteContext context, CancellationToken cancellationToken = default)
     {
         if (_model == null)
         {
             _logger.LogWarning("ML model not loaded, cannot make predictions");
-            return null;
+            return Task.FromResult<MLRoutingPrediction?>(null);
         }
 
         try
@@ -81,22 +83,22 @@ public class PredictionService : IPredictionService
             if (bestPsp == null)
             {
                 _logger.LogWarning("No valid PSP predictions generated");
-                return null;
+                return Task.FromResult<MLRoutingPrediction?>(null);
             }
 
-            return new MLRoutingPrediction
+            return Task.FromResult<MLRoutingPrediction?>(new MLRoutingPrediction
             {
                 RecommendedPsp = bestPsp.PspName,
                 SuccessProbability = bestPsp.SuccessProbability,
                 AllPredictions = predictions,
                 ModelVersion = "1.0",
                 PredictionTimestamp = DateTime.UtcNow
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error making ML prediction for transaction {MerchantId}", context.Tx.MerchantId);
-            return null;
+            return Task.FromResult<MLRoutingPrediction?>(null);
         }
     }
 
@@ -169,6 +171,8 @@ public class PredictionService : IPredictionService
 
     private long GetCountryId(string countryCode)
     {
+        // TODO: Implement proper country lookup service
+
         // Simple mapping - in production, this would come from a lookup service
         return countryCode.ToUpperInvariant() switch
         {
@@ -188,6 +192,8 @@ public class PredictionService : IPredictionService
 
     private long GetPspId(string pspName)
     {
+        // TODO: Implement proper PSP lookup service
+        
         // Simple mapping - in production, this would come from a lookup service
         return pspName.ToUpperInvariant() switch
         {

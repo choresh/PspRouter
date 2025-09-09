@@ -106,8 +106,24 @@ builder.Services.AddSingleton<IPredictionService>(provider =>
     return service;
 });
 
+// === Register PSP Performance Predictor ===
+builder.Services.AddSingleton<IPspPerformancePredictor>(provider =>
+{
+    var logger = provider.GetRequiredService<ILogger<PspPerformancePredictor>>();
+    var pspCandidateSettings = new PspCandidateSettings();
+    builder.Configuration.GetSection("PspRouter:PspCandidates").Bind(pspCandidateSettings);
+    return new PspPerformancePredictor(logger, pspCandidateSettings);
+});
+
 // === Register PSP Candidate Provider ===
-builder.Services.AddSingleton<IPspCandidateProvider, PspCandidateProvider>();
+builder.Services.AddSingleton<IPspCandidateProvider>(provider =>
+{
+    var logger = provider.GetRequiredService<ILogger<MLEnhancedPspCandidateProvider>>();
+    var pspCandidateSettings = new PspCandidateSettings();
+    builder.Configuration.GetSection("PspRouter:PspCandidates").Bind(pspCandidateSettings);
+    var performancePredictor = provider.GetRequiredService<IPspPerformancePredictor>();
+    return new MLEnhancedPspCandidateProvider(logger, pspCandidateSettings, performancePredictor);
+});
 
 // === Register ML Router ===
 builder.Services.AddScoped(provider =>
