@@ -33,16 +33,7 @@ public class IntegrationTests
             
             // Build context
             var candidates = await BuildCandidates(tx);
-            var prefs = new Dictionary<string, string> { ["prefer_low_fees"] = "true" };
-            var stats = new Dictionary<string, double>
-            {
-                ["Adyen_USD_Visa_auth"] = 0.89,
-                ["Stripe_USD_Visa_auth"] = 0.87,
-                ["Adyen_GBP_Mastercard_auth"] = 0.85,
-                ["Stripe_GBP_Mastercard_auth"] = 0.83
-            };
-
-            var ctx = new RouteContext(tx, candidates, prefs, stats);
+            var ctx = new RouteContext(tx, candidates);
 
             // Make routing decision
             var decision = await router.Decide(ctx, CancellationToken.None);

@@ -33,9 +33,7 @@ public class RoutingController : ControllerBase
 
             var context = new Lib.RouteContext(
                 request.Transaction,
-                request.Candidates,
-                request.Preferences ?? new Dictionary<string, string>(),
-                request.Statistics ?? new Dictionary<string, double>()
+                request.Candidates
             );
 
             var decision = await _router.Decide(context, CancellationToken.None);
@@ -91,13 +89,4 @@ public class RouteRequest
     /// </summary>
     public List<PspSnapshot> Candidates { get; set; } = new();
 
-    /// <summary>
-    /// Routing preferences
-    /// </summary>
-    public Dictionary<string, string>? Preferences { get; set; }
-
-    /// <summary>
-    /// Historical statistics
-    /// </summary>
-    public Dictionary<string, double>? Statistics { get; set; }
 }

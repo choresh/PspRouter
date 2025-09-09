@@ -73,10 +73,10 @@ Transaction Request
 
 2. **Inputs prepared**
    - Valid PSP candidates after guardrails
-   - Transaction context and merchant preferences
+   - Transaction context and PSP performance data
 
 3. **Context built for the fine-tuned model**
-   - Serialize a structured object with: `Transaction`, `Candidates`, `MerchantPreferences`
+   - Serialize a structured object with: `Transaction`, `Candidates`
 
 4. **Prompting**
    - Construct a strict system prompt with rules and response schema
@@ -85,7 +85,7 @@ Transaction Request
 5. **Inference**
    - Call the fine-tuned model to produce a JSON decision using learned patterns from training data
    - Model uses current transaction context and PSP snapshots
-  
+
 6. **Validation**
    - Parse JSON to a `RouteDecision`
    - Ensure the chosen `Candidate` is one of the valid PSPs
@@ -173,14 +173,7 @@ var valid = ctx.Candidates
       "FeeBps": 200,
       "Supports3DS": true
     }
-  ],
-  "MerchantPreferences": {
-    "prefer_low_fees": "true"
-  },
-  "SegmentStats": {
-    "Adyen_USD_Card_auth": 0.89,
-    "Stripe_USD_Card_auth": 0.87
-  }
+  ]
 }
 ```
 
@@ -189,20 +182,18 @@ var valid = ctx.Candidates
 #### **1. Context Analysis**
 - Transaction characteristics (amount, risk, currency, method, BIN)
 - Current PSP snapshots (health, auth rates, fees, capabilities)
-- Merchant preferences and business rules
-- Segment statistics (if provided)
 
-#### **2. Learned Pattern Application**
-- **Compliance Enforcement**: SCA/3DS requirements learned from training data
-- **PSP Performance Patterns**: Learned from historical success rates and response times
-- **Preference Handling**: Learned from merchant patterns and outcomes
-- **Risk Management**: Learned from historical risk-based routing patterns
+#### **2. Pattern Application**
+- **Compliance Enforcement**: SCA/3DS requirements using current transaction and PSP data
+- **PSP Performance Analysis**: Using current auth rates, fees, and health status
+- **Risk Assessment**: Using current transaction risk score and pre-trained risk patterns
+- **Multi-factor Decision Making**: Balancing compliance, performance, and risk using pre-trained patterns
 
 #### **3. Intelligent Reasoning**
-The fine-tuned model can handle complex scenarios using learned patterns:
-- "High-risk transaction needs 3DS support" (learned from training data)
-- "Merchant prefers low fees, but auth rate is more important for this amount" (learned from outcomes)
-- "Weekend transactions have different patterns" (learned from temporal patterns)
+The fine-tuned model can handle complex scenarios using pre-trained patterns:
+- "High-risk transaction (RiskScore=85) needs 3DS support" (using current risk score + pre-trained patterns)
+- "Low auth rate PSP (0.75) not suitable for high-value transaction" (using current PSP data + pre-trained patterns)
+- "Weekend transactions have different success patterns" (pre-trained temporal patterns)
 
 #### **4. Structured Decision Output**
 ```json
@@ -256,9 +247,9 @@ The fine-tuned model transforms the PSP Router into an **intelligent payment exp
 2. **📋 Applies Rules**: Enforces compliance and business logic learned from training data
 3. **🔧 Adapts**: Handles edge cases and complex scenarios using historical knowledge
 4. **📊 Explains**: Provides clear reasoning for decisions based on training data
-5. **🎓 Learns**: Continuously improves through retraining with new transaction data
+5. **🎯 Optimizes**: Makes decisions using pre-trained patterns from historical data
 
-This makes the system capable of handling real-world payment routing scenarios that require expert-level decision making, all learned from historical transaction data.
+This makes the system capable of handling real-world payment routing scenarios that require expert-level decision making, using pre-trained patterns from historical transaction data.
 
 ## ⚙️ **A.10 Fine-Tuned Model Approach**
 
@@ -281,7 +272,7 @@ This makes the system capable of handling real-world payment routing scenarios t
 - **PSP Capabilities**: Which PSPs work best for different payment methods, currencies, regions
 - **Complex Routing Logic**: Multi-factor decision making from training examples
 - **Compliance Rules**: SCA/3DS requirements and regulatory patterns
-- **Merchant Preferences**: Patterns from merchant-specific routing outcomes
+- **Merchant Patterns**: Patterns from merchant-specific routing outcomes
 
 ### **Training data format**
 ```json
@@ -455,4 +446,4 @@ This document has covered the key AI/ML concepts used in the PSP Router:
 3. **⚙️ Fine-Tuned Model Approach**: Comprehensive guide to the fine-tuning methodology
 4. **🎓 Training Data**: The foundation that teaches the model payment routing expertise
 
-These concepts work together to create an intelligent payment routing system that learns from historical transaction data and makes increasingly better decisions over time! 🚀
+These concepts work together to create an intelligent payment routing system that uses pre-trained patterns from historical transaction data to make optimal routing decisions! 🚀

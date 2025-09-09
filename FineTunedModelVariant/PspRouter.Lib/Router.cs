@@ -60,9 +60,7 @@ public sealed class PspRouter
         // Build context for LLM
         var contextJson = JsonSerializer.Serialize(new {
             Transaction = ctx.Tx,
-            Candidates = validCandidates,
-            MerchantPreferences = ctx.MerchantPrefs,
-            SegmentStats = ctx.SegmentStats
+            Candidates = validCandidates
         }, new JsonSerializerOptions { WriteIndented = true });
 
         var systemPrompt = BuildSystemPrompt();
@@ -95,7 +93,7 @@ public sealed class PspRouter
         CRITICAL RULES:
         1. NEVER route to a PSP that doesn't support the payment method
         2. ALWAYS enforce SCA/3DS requirements when specified
-        3. Consider authorization rates, fees, and merchant preferences
+        3. Consider authorization rates, fees, and compliance requirements
         4. Use learned patterns from training to inform decisions
         5. Provide clear reasoning for your choice
 
@@ -103,8 +101,7 @@ public sealed class PspRouter
         1. Compliance (SCA/3DS requirements)
         2. Authorization success rates
         3. Fee optimization
-        4. Merchant preferences
-        5. Historical performance
+        4. Historical performance patterns
 
         RESPONSE FORMAT:
         Return a JSON object with this exact structure:
@@ -120,7 +117,7 @@ public sealed class PspRouter
                 "Retry_Window_Ms": 8000,
                 "Max_Retries": 1
             },
-            "Features_Used": ["auth=0.89", "fee_bps=200", "preference=low_fees"]
+            "Features_Used": ["auth=0.89", "fee_bps=200", "compliance=3ds"]
         }
         """;
     }

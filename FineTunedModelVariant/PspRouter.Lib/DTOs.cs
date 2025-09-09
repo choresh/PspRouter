@@ -27,9 +27,7 @@ public record PspSnapshot(
 
 public record RouteContext(
     RouteInput Tx,
-    IReadOnlyList<PspSnapshot> Candidates,
-    IReadOnlyDictionary<string,string> MerchantPrefs,
-    IReadOnlyDictionary<string,double> SegmentStats
+    IReadOnlyList<PspSnapshot> Candidates
 );
 
 public record RouteConstraints(bool Must_Use_3ds, int Retry_Window_Ms, int Max_Retries);
