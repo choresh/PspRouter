@@ -76,7 +76,7 @@ Transaction Request
    - Transaction context and PSP performance data
 
 3. **Context built for the fine-tuned model**
-   - Serialize a structured object with: `Transaction`, `Candidates`
+   - Serialize a structured object with: `Transaction`, `Candidates`, `Weights`
 
 4. **Prompting**
    - Construct a strict system prompt with rules and response schema
@@ -84,7 +84,7 @@ Transaction Request
 
 5. **Inference**
    - Call the fine-tuned model to produce a JSON decision using learned patterns from training data
-   - Model uses current transaction context and PSP snapshots
+   - Model uses current transaction context, PSP snapshots, and product-defined `Weights`
 
 6. **Validation**
    - Parse JSON to a `RouteDecision`
@@ -173,7 +173,17 @@ var valid = ctx.Candidates
       "FeeBps": 200,
       "Supports3DS": true
     }
-  ]
+  ],
+  "Weights": {
+    "AuthWeight": 1.2,
+    "FeeBpsWeight": 0.8,
+    "FixedFeeWeight": 0.5,
+    "BusinessBiasWeight": 0.1,
+    "BusinessBias": { "Adyen": 0.02, "Stripe": -0.01 },
+    "Supports3DSBonusWhenSCARequired": 0.0,
+    "RiskScorePenaltyPerPoint": 0.0,
+    "HealthYellowPenalty": 0.0
+  }
 }
 ```
 

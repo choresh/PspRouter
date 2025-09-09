@@ -63,7 +63,8 @@ public sealed class PspRouter
         // Build context for LLM
         var contextJson = JsonSerializer.Serialize(new {
             Transaction = ctx.Tx,
-            Candidates = validCandidates
+            Candidates = validCandidates,
+            Weights = _settings.Weights
         }, new JsonSerializerOptions { WriteIndented = true });
 
         var systemPrompt = BuildSystemPrompt();
@@ -102,9 +103,12 @@ public sealed class PspRouter
 
         DECISION FACTORS (in order of importance):
         1. Compliance (SCA/3DS requirements)
-        2. Authorization success rates
-        3. Fee optimization
-        4. Historical performance patterns
+        2. Authorization success rates (weighted by Weights.AuthWeight)
+        3. Fee optimization (variable fees weighted by Weights.FeeBpsWeight, fixed by Weights.FixedFeeWeight)
+        4. Business bias (Weights.BusinessBiasWeight × Weights.BusinessBias[psp] if provided)
+        5. Health (penalize yellow by Weights.HealthYellowPenalty; red is already excluded)
+        6. Risk (apply Weights.RiskScorePenaltyPerPoint × risk_score/100)
+        7. 3DS (apply Weights.Supports3DSBonusWhenSCARequired bonus when SCA is required and PSP supports 3DS)
 
         RESPONSE FORMAT:
         Return a JSON object with this exact structure:
@@ -129,11 +133,35 @@ public sealed class PspRouter
     {
         // Fallback to deterministic scoring with configurable weights
         var w = _settings.Weights;
-        var best = candidates.OrderByDescending(c =>
-            w.AuthWeight * c.AuthRate30d
-            - w.FeeBpsWeight * (c.FeeBps / 10000.0)
-            - w.FixedFeeWeight * (double)(c.FixedFee / Math.Max(tx.Amount, 1m))
-        ).First();
+        var bias = w.BusinessBias;
+        var biasWeight = w.BusinessBiasWeight;
+        double Score(PspSnapshot c)
+        {
+            var baseScore =
+                w.AuthWeight * c.AuthRate30d
+                - w.FeeBpsWeight * (c.FeeBps / 10000.0)
+                - w.FixedFeeWeight * (double)(c.FixedFee / Math.Max(tx.Amount, 1m))
+                + biasWeight * (bias.TryGetValue(c.Name, out var b) ? b : 0.0);
+
+            // Bonus for 3DS support when SCA is required
+            if (tx.SCARequired && tx.PaymentMethodId == 1 && c.Supports3DS)
+            {
+                baseScore += w.Supports3DSBonusWhenSCARequired;
+            }
+
+            // Penalty for yellow health (red is already filtered out)
+            if (string.Equals(c.Health, "yellow", StringComparison.OrdinalIgnoreCase))
+            {
+                baseScore -= w.HealthYellowPenalty;
+            }
+
+            // Risk penalty per risk point (0-100)
+            baseScore -= w.RiskScorePenaltyPerPoint * tx.RiskScore / 100.0;
+
+            return baseScore;
+        }
+
+        var best = candidates.OrderByDescending(Score).First();
 
         return CreateDecision(best, candidates, tx, "Deterministic scoring", "deterministic");
     }

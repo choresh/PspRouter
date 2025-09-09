@@ -514,18 +514,47 @@ Console.WriteLine($"Selected PSP: {decision.Candidate}");
 var chatClient = new OpenAIChatClient(apiKey, model: "ft:gpt-3.5-turbo:your-org:psp-router:abc123");
 ```
 
+### Routing Weights (product-tunable)
+At `PspRouter.API/appsettings.json` under `PspRouter:Routing`.
+
+```json
+"PspRouter": {
+  "Routing": {
+    "Weights": {
+      "AuthWeight": 1.2,
+      "FeeBpsWeight": 0.8,
+      "FixedFeeWeight": 0.5,
+      "BusinessBiasWeight": 0.1,
+      "BusinessBias": {
+        "Adyen": 0.02,
+        "Stripe": -0.01
+      },
+      "Supports3DSBonusWhenSCARequired": 0.0,
+      "RiskScorePenaltyPerPoint": 0.0,
+      "HealthYellowPenalty": 0.0
+    },
+    "AllowedHealthStatuses": ["green", "yellow"]
+  }
+}
+```
+
+Notes:
+- Weights are applied in both the LLM context and deterministic fallback.
+- `BusinessBias` is a per-PSP map; `BusinessBiasWeight` scales it.
+
 ## 📊 Decision Factors
+- The router applies guardrails first, then both the fine-tuned model and the fallback use product-tunable weights
+- The weights tuning is done in `PspRouter.API/appsettings.json` under `PspRouter:Routing:Weights`
 
-The fine-tuned model considers multiple factors learned from historical data:
-
-1. **Compliance** (SCA/3DS requirements)
-2. **Authorization Success Rates** (learned from historical performance)
-3. **Fee Optimization** (learned from transaction outcomes)
-4. **Merchant Preferences** (learned from merchant patterns)
-5. **Historical Performance** (learned from training data)
-6. **PSP Capabilities** (learned from successful transaction patterns)
-7. **Payment Method Compatibility** (learned from BIN and method patterns)
-8. **Geographic Patterns** (learned from country/region success rates)
+1. **Compliance**: SCA/3DS requirements (guardrail + weighted bonus when applicable)
+2. **Authorization Success Rates**: weighted by `Weights.AuthWeight`
+3. **Fees**:
+   - Variable fee (bps) weighted by `Weights.FeeBpsWeight`
+   - Fixed fee (relative to amount) weighted by `Weights.FixedFeeWeight`
+4. **Business Bias (optional)**: per-PSP bias map scaled by `Weights.BusinessBiasWeight`
+5. **Health**: "red" excluded by guardrails; "yellow" penalized by `Weights.HealthYellowPenalty`
+6. **Risk**: penalized by `Weights.RiskScorePenaltyPerPoint * (riskScore/100)`
+7. **3DS Support**: when SCA is required for cards, bonus `Weights.Supports3DSBonusWhenSCARequired` if PSP supports 3DS
 
 
 ## 🛡 Security & Compliance

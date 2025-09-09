@@ -48,6 +48,11 @@ This document outlines all the components that need to be implemented to complet
    - Run `dotnet run --project PspRouter.Trainer` to execute the workflow
    - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.API\.env`)
 
+#### Product-Tunable Weights (Routing)
+- [ ] Configure `PspRouter:Routing:Weights` in `PspRouter.API/appsettings.json`
+- [ ] Configure `AllowedHealthStatuses` in `PspRouter.API/appsettings.json`
+
+
 #### Fine-tuning workflow (REQUIRED for production)
 - [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
    - Adjust sampling via `Trainer:Sampling` in `PspRouter.Trainer/appsettings.json` (e.g., TargetSampleSize, DateWindowMonths, MaxPerSegment)
@@ -118,6 +123,7 @@ This document outlines all the components that need to be implemented to complet
 - [ ] Model accuracy validation tests
 - [ ] RouteDecision schema validation tests
 - [ ] Historical data quality checks
+- [ ] Scoring with edge weights (values `PspRouter:Routing:Weights` in `PspRouter.API/appsettings.json`)
  
 ---
 
