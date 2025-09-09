@@ -48,15 +48,15 @@ This document outlines all the components that need to be implemented to complet
 - [ ] Configure timeout/fallback (e.g., 800–1200 ms) and strict JSON validation
 - [ ] Observability: latency, tokens, fallback rate, schema errors
 - [ ] Tests: unit (schema/fallback), integration (end-to-end), performance (P95)
+- [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
+   - Run `dotnet run --project PspRouter.Trainer` to execute the workflow
+   - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.Trainer\.env`)
 
 #### Fine-tuning workflow (REQUIRED for production)
-- [ ] **Data prep**: collect de-PII'd labeled decisions from `PaymentTransactions` table
-- [ ] **Training data**: format as JSONL with `RouteInput` → `RouteDecision` pairs
-- [ ] **Upload training file**: use `TrainingService.UploadFileToOpenAIAsync()`
-- [ ] **Create fine-tune job**: use `TrainingService.CreateFineTuningJobViaHttpAsync()`
-- [ ] **Monitor training**: use `TrainingService.GetFineTuningJobDetailsAsync()`
-- [ ] **Offline eval**: test against holdout data; fix errors; iterate
-- [ ] **Production rollout**: shadow/A-B test in staging; then production with monitoring
+- [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
+   - Change the SQL query (within `GetTrainingDataAsync`): use a much larger, diverse sample for training (thousands to hundreds of thousands of rows) covering successes and failures, multiple currencies, payment methods, regions, 3DS vs non-3DS, tokenized vs non-tokenized, and a wide risk-score distribution.
+   - Run `dotnet run --project PspRouter.Trainer` to execute the workflow
+  - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.Trainer\.env`)
 
 ---
 
