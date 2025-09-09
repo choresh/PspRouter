@@ -1,0 +1,26 @@
+{
+  "ModelType": "LightGBM_Health",
+  "TrainingDate": "2025-09-09T23:20:41.5860856Z",
+  "Version": "1.0",
+  "Features": [
+    "Amount",
+    "PaymentMethodId",
+    "CurrencyId",
+    "CountryId",
+    "RiskScore",
+    "IsTokenized",
+    "HasThreeDS",
+    "IsRerouted",
+    "PspId",
+    "HourOfDay",
+    "DayOfWeek",
+    "DayOfMonth",
+    "MonthOfYear",
+    "RecentSuccessRate",
+    "RecentProcessingTime",
+    "RecentVolume",
+    "AmountLog",
+    "RiskAdjustedAmount",
+    "TimeOfDayCategory"
+  ]
+}

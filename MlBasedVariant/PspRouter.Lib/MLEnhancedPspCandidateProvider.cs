@@ -196,7 +196,7 @@ public class MLEnhancedPspCandidateProvider : IPspCandidateProvider
                             WHEN DateStatusLastUpdated < DateCreated THEN 0
                             WHEN DATEDIFF(DAY, DateCreated, DateStatusLastUpdated) > 30 THEN 0
                             WHEN DATEDIFF(DAY, DateCreated, DateStatusLastUpdated) < 0 THEN 0
-                            ELSE DATEDIFF(MINUTE, DateCreated, DateStatusLastUpdated) * 60000
+                            ELSE CAST(DATEDIFF(MINUTE, DateCreated, DateStatusLastUpdated) AS BIGINT) * 60000
                         END) as AvgProcessingTime,
                         MAX(CASE WHEN IsTokenized = 1 THEN 1 ELSE 0 END) as SupportsTokenization,
                         MAX(CASE WHEN ThreeDSTypeId IS NOT NULL THEN 1 ELSE 0 END) as Supports3DS

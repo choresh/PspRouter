@@ -68,11 +68,10 @@ public class TrainingService : ITrainingService
             var pipeline = CreateTrainingPipeline();
             var trainedModel = pipeline.Fit(trainTestSplit.TrainSet);
             
-        // 6. Evaluate the model
-        _logger.LogInformation("Step 6: Evaluating model...");
-        var predictions = trainedModel.Transform(trainTestSplit.TestSet);
-        var metrics = _mlContext.BinaryClassification.Evaluate(predictions, 
-            labelColumnName: nameof(RoutingFeatures.IsSuccessful));
+            // 6. Evaluate the model
+            _logger.LogInformation("Step 6: Evaluating model...");
+            var predictions = trainedModel.Transform(trainTestSplit.TestSet);
+            var metrics = _mlContext.BinaryClassification.Evaluate(predictions, labelColumnName: nameof(RoutingFeatures.IsSuccessful));
             
             _logger.LogInformation("Model training completed successfully!");
             _logger.LogInformation("Accuracy: {Accuracy:F4}", metrics.Accuracy);
@@ -84,7 +83,7 @@ public class TrainingService : ITrainingService
             
             // 7. Save the model
             _logger.LogInformation("Step 7: Saving trained model...");
-            await SaveModel(trainedModel, cancellationToken);
+            await SavePspSelectionModel(trainedModel, cancellationToken);
             
             // 8. Log feature importance
             _logger.LogInformation("Top Feature Importance:");
@@ -144,22 +143,25 @@ public class TrainingService : ITrainingService
         }
     }
 
-    private async Task SaveModel(ITransformer model, CancellationToken cancellationToken)
+    private async Task SavePspSelectionModel(ITransformer model, CancellationToken cancellationToken)
     {
         try
         {
+            // Resolve the model path relative to solution root
+            var resolvedPath = PathHelper.ResolvePath(_settings.ModelOutputPath);
+            
             // Ensure directory exists
-            var directory = Path.GetDirectoryName(_settings.ModelOutputPath);
+            var directory = Path.GetDirectoryName(resolvedPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
             
             // Save the model
-            _mlContext.Model.Save(model, null, _settings.ModelOutputPath);
+            _mlContext.Model.Save(model, null, resolvedPath);
             
             // Save model metadata
-            var metadataPath = Path.ChangeExtension(_settings.ModelOutputPath, ".metadata.json");
+            var metadataPath = Path.ChangeExtension(resolvedPath, ".metadata.json");
             var metadata = new
             {
                 ModelType = "LightGBM",
@@ -270,7 +272,18 @@ public class TrainingService : ITrainingService
 
     private async Task TrainSuccessRateModel(IEnumerable<PspPerformanceFeatures> data, CancellationToken cancellationToken)
     {
-        var config = new PspPerformanceModelConfig();
+        // Use the loaded configuration from appsettings
+        var config = new PspPerformanceModelConfig
+        {
+            ValidationFraction = _settings.PspPerformanceModels.ValidationFraction,
+            SuccessRateMaxIterations = _settings.PspPerformanceModels.SuccessRateMaxIterations,
+            SuccessRateLearningRate = _settings.PspPerformanceModels.SuccessRateLearningRate,
+            SuccessRateNumLeaves = _settings.PspPerformanceModels.SuccessRateNumLeaves,
+            MinDataInLeaf = _settings.PspPerformanceModels.MinDataInLeaf,
+            EarlyStoppingRounds = _settings.PspPerformanceModels.EarlyStoppingRounds,
+            Seed = _settings.PspPerformanceModels.Seed,
+            SuccessRateModelPath = _settings.PspPerformanceModels.SuccessRateModelPath
+        };
         
         // Prepare data for success rate prediction
         var dataView = _mlContext.Data.LoadFromEnumerable(data);
@@ -323,7 +336,18 @@ public class TrainingService : ITrainingService
 
     private async Task TrainProcessingTimeModel(IEnumerable<PspPerformanceFeatures> data, CancellationToken cancellationToken)
     {
-        var config = new PspPerformanceModelConfig();
+        // Use the loaded configuration from appsettings
+        var config = new PspPerformanceModelConfig
+        {
+            ValidationFraction = _settings.PspPerformanceModels.ValidationFraction,
+            ProcessingTimeMaxIterations = _settings.PspPerformanceModels.ProcessingTimeMaxIterations,
+            ProcessingTimeLearningRate = _settings.PspPerformanceModels.ProcessingTimeLearningRate,
+            ProcessingTimeNumLeaves = _settings.PspPerformanceModels.ProcessingTimeNumLeaves,
+            MinDataInLeaf = _settings.PspPerformanceModels.MinDataInLeaf,
+            EarlyStoppingRounds = _settings.PspPerformanceModels.EarlyStoppingRounds,
+            Seed = _settings.PspPerformanceModels.Seed,
+            ProcessingTimeModelPath = _settings.PspPerformanceModels.ProcessingTimeModelPath
+        };
         
         // Prepare data for regression
         var dataView = _mlContext.Data.LoadFromEnumerable(data);
@@ -376,10 +400,26 @@ public class TrainingService : ITrainingService
 
     private async Task TrainHealthModel(IEnumerable<PspPerformanceFeatures> data, CancellationToken cancellationToken)
     {
-        var config = new PspPerformanceModelConfig();
+        // Use the loaded configuration from appsettings
+        var config = new PspPerformanceModelConfig
+        {
+            ValidationFraction = _settings.PspPerformanceModels.ValidationFraction,
+            HealthMaxIterations = _settings.PspPerformanceModels.HealthMaxIterations,
+            HealthLearningRate = _settings.PspPerformanceModels.HealthLearningRate,
+            HealthNumLeaves = _settings.PspPerformanceModels.HealthNumLeaves,
+            MinDataInLeaf = _settings.PspPerformanceModels.MinDataInLeaf,
+            EarlyStoppingRounds = _settings.PspPerformanceModels.EarlyStoppingRounds,
+            Seed = _settings.PspPerformanceModels.Seed,
+            HealthModelPath = _settings.PspPerformanceModels.HealthModelPath
+        };
         
         // Prepare data for multiclass classification
         var dataView = _mlContext.Data.LoadFromEnumerable(data);
+        
+        // Log health score distribution to debug
+        var healthScores = data.Select(d => d.HealthScore).Distinct().OrderBy(x => x).ToList();
+        _logger.LogInformation("Health scores in data: {HealthScores}", string.Join(", ", healthScores));
+        
         var trainTestSplit = _mlContext.Data.TrainTestSplit(dataView, testFraction: config.ValidationFraction);
         
         // Create pipeline for multiclass classification
@@ -404,8 +444,9 @@ public class TrainingService : ITrainingService
                 nameof(PspPerformanceFeatures.RiskAdjustedAmount),
                 nameof(PspPerformanceFeatures.TimeOfDayCategory))
             .Append(_mlContext.Transforms.NormalizeMinMax("Features"))
+            .Append(_mlContext.Transforms.Conversion.MapValueToKey("HealthScoreKey", nameof(PspPerformanceFeatures.HealthScore)))
             .Append(_mlContext.MulticlassClassification.Trainers.LightGbm(
-                labelColumnName: nameof(PspPerformanceFeatures.HealthScore),
+                labelColumnName: "HealthScoreKey",
                 featureColumnName: "Features",
                 numberOfLeaves: config.HealthNumLeaves,
                 minimumExampleCountPerLeaf: config.MinDataInLeaf,
@@ -418,7 +459,7 @@ public class TrainingService : ITrainingService
         // Evaluate
         var predictions = trainedModel.Transform(trainTestSplit.TestSet);
         var metrics = _mlContext.MulticlassClassification.Evaluate(predictions, 
-            labelColumnName: nameof(PspPerformanceFeatures.HealthScore));
+            labelColumnName: "HealthScoreKey");
         
         _logger.LogInformation("Health Model - Accuracy: {Accuracy:F4}, Log Loss: {LogLoss:F4}", 
             metrics.MacroAccuracy, metrics.LogLoss);
@@ -431,18 +472,21 @@ public class TrainingService : ITrainingService
     {
         try
         {
+            // Resolve the model path relative to solution root
+            var resolvedPath = PathHelper.ResolvePath(modelPath);
+            
             // Ensure directory exists
-            var directory = Path.GetDirectoryName(modelPath);
+            var directory = Path.GetDirectoryName(resolvedPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
             
             // Save the model
-            _mlContext.Model.Save(model, null, modelPath);
+            _mlContext.Model.Save(model, null, resolvedPath);
             
             // Save model metadata
-            var metadataPath = Path.ChangeExtension(modelPath, ".metadata.json");
+            var metadataPath = Path.ChangeExtension(resolvedPath, ".metadata.json");
             var metadata = new
             {
                 ModelType = $"LightGBM_{modelType}",
@@ -459,7 +503,7 @@ public class TrainingService : ITrainingService
             
             await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
             
-            _logger.LogInformation("PSP {ModelType} model saved to: {ModelPath}", modelType, modelPath);
+            _logger.LogInformation("PSP {ModelType} model saved to: {ModelPath}", modelType, resolvedPath);
         }
         catch (Exception ex)
         {

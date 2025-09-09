@@ -1,6 +1,6 @@
 {
   "ModelType": "LightGBM",
-  "TrainingDate": "2025-09-09T16:59:41.7492829Z",
+  "TrainingDate": "2025-09-09T23:19:44.9312434Z",
   "Config": {
     "MaxIterations": 1000,
     "LearningRate": 0.1,

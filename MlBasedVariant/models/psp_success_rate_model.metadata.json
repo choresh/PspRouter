@@ -1,0 +1,26 @@
+{
+  "ModelType": "LightGBM_SuccessRate",
+  "TrainingDate": "2025-09-09T23:20:04.9311831Z",
+  "Version": "1.0",
+  "Features": [
+    "Amount",
+    "PaymentMethodId",
+    "CurrencyId",
+    "CountryId",
+    "RiskScore",
+    "IsTokenized",
+    "HasThreeDS",
+    "IsRerouted",
+    "PspId",
+    "HourOfDay",
+    "DayOfWeek",
+    "DayOfMonth",
+    "MonthOfYear",
+    "RecentSuccessRate",
+    "RecentProcessingTime",
+    "RecentVolume",
+    "AmountLog",
+    "RiskAdjustedAmount",
+    "TimeOfDayCategory"
+  ]
+}

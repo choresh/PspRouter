@@ -52,103 +52,49 @@ public class PspPerformanceDataProvider
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync(cancellationToken);
             
-            // Query to fetch PSP performance data with historical context
+            // Much simpler query without complex calculations to avoid timeouts
             var query = @"
-                WITH PspPerformanceMetrics AS (
-                    SELECT 
-                        pt.PaymentGatewayId,
-                        CAST(pt.PaymentGatewayId AS NVARCHAR(50)) as PspName,
-                        pt.PaymentTransactionId,
-                        pt.OrderId,
-                        pt.Amount,
-                        pt.PaymentMethodId,
-                        pt.CurrencyId,
-                        pt.CountryId,
-                        pt.PaymentCardBin,
-                        pt.ThreeDSTypeId,
-                        pt.IsTokenized,
-                        pt.PaymentTransactionStatusId,
-                        pt.GatewayStatusReason,
-                        pt.GatewayResponseCode,
-                        pt.IsReroutedFlag,
-                        pt.PaymentRoutingRuleId,
-                        pt.DateCreated,
-                        pt.DateStatusLastUpdated,
-                        pt.PspReference,
-                        CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END AS IsSuccess,
-                        CASE 
-                            WHEN pt.DateStatusLastUpdated IS NULL OR pt.DateCreated IS NULL THEN 0
-                            WHEN pt.DateStatusLastUpdated < pt.DateCreated THEN 0
-                            WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) > 30 THEN 0
-                            WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) < 0 THEN 0
-                            ELSE DATEDIFF(MINUTE, pt.DateCreated, pt.DateStatusLastUpdated) * 60000
-                        END AS ProcessingTimeMs,
-                        -- Calculate recent performance metrics (last 7 days)
-                        (
-                            SELECT AVG(CASE WHEN pt2.PaymentTransactionStatusId IN (5, 7, 9) THEN 1.0 ELSE 0.0 END)
-                            FROM PaymentTransactions pt2
-                            WHERE pt2.PaymentGatewayId = pt.PaymentGatewayId
-                                AND pt2.DateCreated >= DATEADD(DAY, -7, pt.DateCreated)
-                                AND pt2.DateCreated < pt.DateCreated
-                        ) AS RecentSuccessRate,
-                        (
-                            SELECT AVG(
-                                CASE 
-                                    WHEN pt2.DateStatusLastUpdated IS NULL OR pt2.DateCreated IS NULL THEN 0
-                                    WHEN pt2.DateStatusLastUpdated < pt2.DateCreated THEN 0
-                                    WHEN DATEDIFF(DAY, pt2.DateCreated, pt2.DateStatusLastUpdated) > 30 THEN 0
-                                    WHEN DATEDIFF(DAY, pt2.DateCreated, pt2.DateStatusLastUpdated) < 0 THEN 0
-                                    ELSE DATEDIFF(MINUTE, pt2.DateCreated, pt2.DateStatusLastUpdated) * 60000
-                                END
-                            )
-                            FROM PaymentTransactions pt2
-                            WHERE pt2.PaymentGatewayId = pt.PaymentGatewayId
-                                AND pt2.DateCreated >= DATEADD(DAY, -7, pt.DateCreated)
-                                AND pt2.DateCreated < pt.DateCreated
-                        ) AS RecentProcessingTime,
-                        (
-                            SELECT COUNT(*)
-                            FROM PaymentTransactions pt2
-                            WHERE pt2.PaymentGatewayId = pt.PaymentGatewayId
-                                AND pt2.DateCreated >= DATEADD(DAY, -7, pt.DateCreated)
-                                AND pt2.DateCreated < pt.DateCreated
-                        ) AS RecentVolume
-                    FROM PaymentTransactions pt
-                    WHERE pt.DateCreated >= DATEADD(MONTH, -@Months, GETDATE())
-                        AND pt.PaymentGatewayId IS NOT NULL
-                        AND pt.PaymentTransactionStatusId IN (5, 7, 9, 11, 15, 17, 22)
-                        AND pt.CountryId IS NOT NULL
-                        AND pt.PaymentMethodId IS NOT NULL
-                )
                 SELECT 
-                    PaymentGatewayId,
-                    PspName,
-                    PaymentTransactionId,
-                    OrderId,
-                    Amount,
-                    PaymentMethodId,
-                    CurrencyId,
-                    CountryId,
-                    PaymentCardBin,
-                    ThreeDSTypeId,
-                    IsTokenized,
-                    PaymentTransactionStatusId,
-                    GatewayStatusReason,
-                    GatewayResponseCode,
-                    IsReroutedFlag,
-                    PaymentRoutingRuleId,
-                    DateCreated,
-                    DateStatusLastUpdated,
-                    PspReference,
-                    IsSuccess,
-                    ProcessingTimeMs,
-                    ISNULL(RecentSuccessRate, 0.85) AS RecentSuccessRate,
-                    ISNULL(RecentProcessingTime, 2000) AS RecentProcessingTime,
-                    ISNULL(RecentVolume, 0) AS RecentVolume
-                FROM PspPerformanceMetrics
-                ORDER BY DateCreated DESC";
+                    pt.PaymentGatewayId,
+                    CAST(pt.PaymentGatewayId AS NVARCHAR(50)) as PspName,
+                    pt.PaymentTransactionId,
+                    pt.OrderId,
+                    pt.Amount,
+                    pt.PaymentMethodId,
+                    pt.CurrencyId,
+                    pt.CountryId,
+                    pt.PaymentCardBin,
+                    pt.ThreeDSTypeId,
+                    pt.IsTokenized,
+                    pt.PaymentTransactionStatusId,
+                    pt.GatewayStatusReason,
+                    pt.GatewayResponseCode,
+                    pt.IsReroutedFlag,
+                    pt.PaymentRoutingRuleId,
+                    pt.DateCreated,
+                    pt.DateStatusLastUpdated,
+                    pt.PspReference,
+                    CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END AS IsSuccess,
+                    CASE 
+                        WHEN pt.DateStatusLastUpdated IS NULL OR pt.DateCreated IS NULL THEN 0
+                        WHEN pt.DateStatusLastUpdated < pt.DateCreated THEN 0
+                        WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) > 30 THEN 0
+                        WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) < 0 THEN 0
+                        ELSE CAST(DATEDIFF(MINUTE, pt.DateCreated, pt.DateStatusLastUpdated) AS BIGINT) * 60000
+                    END AS ProcessingTimeMs,
+                    CAST(0.85 AS FLOAT) AS RecentSuccessRate,  -- Default values to avoid complex calculations
+                    CAST(2000 AS FLOAT) AS RecentProcessingTime,
+                    CAST(0 AS INT) AS RecentVolume
+                FROM PaymentTransactions pt
+                WHERE pt.DateCreated >= DATEADD(MONTH, -@Months, GETDATE())
+                    AND pt.PaymentGatewayId IS NOT NULL
+                    AND pt.PaymentTransactionStatusId IN (5, 7, 9, 11, 15, 17, 22)
+                    AND pt.CountryId IS NOT NULL
+                    AND pt.PaymentMethodId IS NOT NULL
+                ORDER BY pt.DateCreated DESC";
             
             using var command = new SqlCommand(query, connection);
+            command.CommandTimeout = 300; // 5 minutes timeout
             command.Parameters.AddWithValue("@Months", _settings.DateWindowMonths);
             using var reader = await command.ExecuteReaderAsync(cancellationToken);
             
@@ -177,14 +123,18 @@ public class PspPerformanceDataProvider
                     MonthOfYear = reader.GetDateTime(16).Month,
                     
                     // Historical performance features
-                    RecentSuccessRate = (float)reader.GetDouble(22),
-                    RecentProcessingTime = (float)reader.GetDouble(23),
-                    RecentVolume = (float)reader.GetInt32(24),
+                    RecentSuccessRate = Convert.ToSingle(reader.GetValue(21)),
+                    RecentProcessingTime = Convert.ToSingle(reader.GetValue(22)),
+                    RecentVolume = (float)reader.GetInt32(23),
                     
                     // Labels
                     IsSuccessful = reader.GetInt32(19) == 1,
-                    ProcessingTimeMs = (float)reader.GetInt32(20),
-                    HealthScore = CalculateHealthScore((float)reader.GetDouble(22), (float)reader.GetDouble(23)),
+                    ProcessingTimeMs = (float)reader.GetInt64(20),
+                    // Use actual transaction success rate and processing time for health score calculation
+                    HealthScore = CalculateHealthScore(
+                        reader.GetInt32(19) == 1 ? 1.0f : 0.0f, // Use actual transaction success
+                        (float)reader.GetInt64(20) // Use actual processing time
+                    ),
                     
                     // Transaction metadata
                     TransactionId = reader.GetInt64(2),
