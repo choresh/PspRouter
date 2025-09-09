@@ -7,10 +7,10 @@ namespace PspRouter.Lib;
 /// </summary>
 public interface IPspCandidateProvider
 {
-    Task<IReadOnlyList<PspSnapshot>> GetCandidatesAsync(RouteInput transaction, CancellationToken cancellationToken = default);
-    Task ProcessFeedbackAsync(TransactionFeedback feedback, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<PspCandidate>> GetAllCandidatesAsync(CancellationToken cancellationToken = default);
-    Task<PspCandidate?> GetCandidateAsync(string pspName, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PspSnapshot>> GetCandidates(RouteInput transaction, CancellationToken cancellationToken = default);
+    Task ProcessFeedback(TransactionFeedback feedback, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PspCandidate>> GetAllCandidates(CancellationToken cancellationToken = default);
+    Task<PspCandidate?> GetCandidate(string pspName, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -28,7 +28,7 @@ public class PspCandidateProvider : IPspCandidateProvider
         _candidates = InitializeDefaultCandidates();
     }
 
-    public Task<IReadOnlyList<PspSnapshot>> GetCandidatesAsync(RouteInput transaction, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<PspSnapshot>> GetCandidates(RouteInput transaction, CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
@@ -57,7 +57,7 @@ public class PspCandidateProvider : IPspCandidateProvider
         }
     }
 
-    public Task ProcessFeedbackAsync(TransactionFeedback feedback, CancellationToken cancellationToken = default)
+    public Task ProcessFeedback(TransactionFeedback feedback, CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
@@ -84,7 +84,7 @@ public class PspCandidateProvider : IPspCandidateProvider
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<PspCandidate>> GetAllCandidatesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<PspCandidate>> GetAllCandidates(CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
@@ -92,7 +92,7 @@ public class PspCandidateProvider : IPspCandidateProvider
         }
     }
 
-    public Task<PspCandidate?> GetCandidateAsync(string pspName, CancellationToken cancellationToken = default)
+    public Task<PspCandidate?> GetCandidate(string pspName, CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {

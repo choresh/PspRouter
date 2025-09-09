@@ -503,7 +503,7 @@ var tx = new RouteInput(
 );
 
 // 1) Build route context (candidates from DB), 2) call API
-var decision = await client.MakeDeterministicDecisionAsync(tx, apiBaseUrl);
+var decision = await client.MakeDeterministicDecision(tx, apiBaseUrl);
 Console.WriteLine($"Selected PSP: {decision.Candidate}");
 ```
 

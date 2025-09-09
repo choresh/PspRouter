@@ -25,7 +25,7 @@ public class PredictionService : IPredictionService
     /// <summary>
     /// Load the trained ML model
     /// </summary>
-    public async Task LoadModelAsync(CancellationToken cancellationToken = default)
+    public async Task LoadModel(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -48,7 +48,7 @@ public class PredictionService : IPredictionService
     /// <summary>
     /// Predict the best PSP for the given routing context
     /// </summary>
-    public async Task<MLRoutingPrediction?> PredictBestPspAsync(RouteContext context, CancellationToken cancellationToken = default)
+    public async Task<MLRoutingPrediction?> PredictBestPsp(RouteContext context, CancellationToken cancellationToken = default)
     {
         if (_model == null)
         {

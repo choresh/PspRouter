@@ -16,7 +16,7 @@ public static class PspRouterClientExamples
         var client = PspRouterClientFactory.Create(connectionString);
         
         // Get all available PSPs
-        var psps = await client.GetAvailablePspsAsync();
+        var psps = await client.GetAvailablePsps();
         
         Console.WriteLine($"Retrieved {psps.Count} PSPs:");
         foreach (var psp in psps)
@@ -37,7 +37,7 @@ public static class PspRouterClientExamples
     {
         var client = PspRouterClientFactory.Create(connectionString);
         
-        var psps = await client.GetPspsForTransactionAsync(currencyId, paymentMethodId);
+        var psps = await client.GetPspsForTransaction(currencyId, paymentMethodId);
         
         Console.WriteLine($"PSPs for CurrencyId={currencyId}, PaymentMethodId={paymentMethodId}:");
         foreach (var psp in psps)
@@ -69,7 +69,7 @@ public static class PspRouterClientExamples
         );
         
         // Make routing decision via API
-        var decision = await client.MakeDeterministicDecisionAsync(transaction, apiBaseUrl);
+        var decision = await client.MakeDeterministicDecision(transaction, apiBaseUrl);
         
         Console.WriteLine($"API routing decision: {decision.Candidate}");
         Console.WriteLine($"Reasoning: {decision.Reasoning}");
@@ -102,7 +102,7 @@ public static class PspRouterClientExamples
         );
         
         // Make routing decision using fine-tuned model
-        var decision = await client.MakeRoutingDecisionAsync(transaction, modelApiUrl, apiKey);
+        var decision = await client.MakeRoutingDecision(transaction, modelApiUrl, apiKey);
         
         Console.WriteLine($"Model routing decision: {decision.Candidate}");
         Console.WriteLine($"Reasoning: {decision.Reasoning}");
@@ -121,7 +121,7 @@ public static class PspRouterClientExamples
     {
         var client = PspRouterClientFactory.Create(connectionString);
         
-        var metrics = await client.GetPspDetailsAsync(pspName);
+        var metrics = await client.GetPspDetails(pspName);
         
         if (metrics != null)
         {
@@ -171,11 +171,11 @@ public static class PspRouterClientExamples
         Console.WriteLine($"Risk Score: {transaction.RiskScore}, SCA Required: {transaction.SCARequired}");
         
         // Get 3DS-capable PSPs
-        var threeDSPsps = await client.Get3DSCapablePspsAsync();
+        var threeDSPsps = await client.Get3DSCapablePsps();
         Console.WriteLine($"Found {threeDSPsps.Count} PSPs with 3DS support");
         
         // Build route context
-        var context = await client.BuildRouteContextAsync(transaction);
+        var context = await client.BuildRouteContext(transaction);
         Console.WriteLine($"Route context built with {context.Candidates.Count} candidates");
         
         // Make routing decision
@@ -183,12 +183,12 @@ public static class PspRouterClientExamples
         if (!string.IsNullOrEmpty(modelApiUrl) && !string.IsNullOrEmpty(apiKey))
         {
             Console.WriteLine("Using fine-tuned model for routing decision...");
-            decision = await client.MakeRoutingDecisionAsync(transaction, modelApiUrl, apiKey);
+            decision = await client.MakeRoutingDecision(transaction, modelApiUrl, apiKey);
         }
         else if (!string.IsNullOrEmpty(apiBaseUrl))
         {
             Console.WriteLine("Using PspRouter.API for routing decision...");
-            decision = await client.MakeDeterministicDecisionAsync(transaction, apiBaseUrl);
+            decision = await client.MakeDeterministicDecision(transaction, apiBaseUrl);
         }
         else
         {
@@ -231,7 +231,7 @@ public static class PspRouterClientExamples
         {
             try
             {
-                var decision = await client.MakeDeterministicDecisionAsync(transaction, apiBaseUrl);
+                var decision = await client.MakeDeterministicDecision(transaction, apiBaseUrl);
                 decisions.Add(decision);
                 
                 Console.WriteLine($"Transaction {transaction.MerchantId}: {decision.Candidate} - {decision.Reasoning}");

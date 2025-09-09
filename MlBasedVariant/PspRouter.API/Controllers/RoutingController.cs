@@ -61,7 +61,7 @@ public class RoutingController : ControllerBase
             _logger.LogInformation("Processing feedback for decision {DecisionId}, PSP {PspName}, Authorized: {Authorized}", 
                 feedback.DecisionId, feedback.PspName, feedback.Authorized);
 
-            await _candidateProvider.ProcessFeedbackAsync(feedback, CancellationToken.None);
+            await _candidateProvider.ProcessFeedback(feedback, CancellationToken.None);
 
             _logger.LogInformation("Feedback processed successfully for PSP {PspName}", feedback.PspName);
 
@@ -90,7 +90,7 @@ public class RoutingController : ControllerBase
     {
         try
         {
-            var candidates = await _candidateProvider.GetAllCandidatesAsync(CancellationToken.None);
+            var candidates = await _candidateProvider.GetAllCandidates(CancellationToken.None);
 
             var candidateData = candidates.Select(c => new
             {

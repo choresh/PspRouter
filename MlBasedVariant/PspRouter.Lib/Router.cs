@@ -30,7 +30,7 @@ public sealed class Router
             transaction.MerchantId, transaction.Amount, transaction.CurrencyId);
 
         // Get candidates from the provider
-        var candidates = await _candidateProvider.GetCandidatesAsync(transaction, ct);
+        var candidates = await _candidateProvider.GetCandidates(transaction, ct);
         
         if (candidates.Count == 0)
         {
@@ -75,7 +75,7 @@ public sealed class Router
         // Create a new context with only valid candidates
         var mlContext = new RouteContext(ctx.Tx, validCandidates);
         
-        var prediction = await _predictionService.PredictBestPspAsync(mlContext, ct);
+        var prediction = await _predictionService.PredictBestPsp(mlContext, ct);
         if (prediction == null)
         {
             _logger?.LogWarning("ML prediction failed");

@@ -5,6 +5,6 @@ namespace PspRouter.Lib;
 /// </summary>
 public interface IPredictionService
 {
-    Task<MLRoutingPrediction?> PredictBestPspAsync(RouteContext context, CancellationToken cancellationToken = default);
+    Task<MLRoutingPrediction?> PredictBestPsp(RouteContext context, CancellationToken cancellationToken = default);
     bool IsModelLoaded { get; }
 }

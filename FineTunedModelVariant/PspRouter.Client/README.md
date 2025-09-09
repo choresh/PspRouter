@@ -28,11 +28,11 @@ using PspRouter.Client;
 var client = PspRouterClientFactory.Create("Server=localhost;Database=Payments;Trusted_Connection=true;");
 
 // Get all available PSPs
-var psps = await client.GetAvailablePspsAsync();
+var psps = await client.GetAvailablePsps();
 Console.WriteLine($"Found {psps.Count} PSPs");
 
 // Get PSPs for specific transaction
-var cardPsps = await client.GetPspsForTransactionAsync(currencyId: 1, paymentMethodId: 1);
+var cardPsps = await client.GetPspsForTransaction(currencyId: 1, paymentMethodId: 1);
 ```
 
 ### Make Routing Decision
@@ -52,7 +52,7 @@ var transaction = new RouteInput(
 );
 
 // Make deterministic routing decision
-var decision = await client.MakeDeterministicDecisionAsync(transaction);
+var decision = await client.MakeDeterministicDecision(transaction);
 
 Console.WriteLine($"Selected PSP: {decision.Candidate}");
 Console.WriteLine($"Reasoning: {decision.Reasoning}");
@@ -62,7 +62,7 @@ Console.WriteLine($"Reasoning: {decision.Reasoning}");
 
 ```csharp
 // Make routing decision using AI model
-var decision = await client.MakeRoutingDecisionAsync(
+var decision = await client.MakeRoutingDecision(
     transaction, 
     modelApiUrl: "https://your-model-api.com/route",
     apiKey: "your-api-key"
@@ -77,13 +77,13 @@ Main client class for PSP routing operations.
 
 #### Methods
 
-- `GetAvailablePspsAsync()` - Get all available PSPs
-- `GetPspsForTransactionAsync(currencyId, paymentMethodId)` - Get PSPs for specific transaction
-- `Get3DSCapablePspsAsync()` - Get PSPs with 3DS support
-- `GetPspDetailsAsync(pspName)` - Get detailed performance metrics
-- `BuildRouteContextAsync(transaction)` - Build routing context
-- `MakeDeterministicDecisionAsync(transaction)` - Make deterministic routing decision
-- `MakeRoutingDecisionAsync(transaction, modelApiUrl, apiKey)` - Make AI-powered routing decision
+- `GetAvailablePsps()` - Get all available PSPs
+- `GetPspsForTransaction(currencyId, paymentMethodId)` - Get PSPs for specific transaction
+- `Get3DSCapablePsps()` - Get PSPs with 3DS support
+- `GetPspDetails(pspName)` - Get detailed performance metrics
+- `BuildRouteContext(transaction)` - Build routing context
+- `MakeDeterministicDecision(transaction)` - Make deterministic routing decision
+- `MakeRoutingDecision(transaction, modelApiUrl, apiKey)` - Make AI-powered routing decision
 
 ### Models
 
@@ -143,7 +143,7 @@ public record RouteDecision(
 ### Get PSP Performance Metrics
 
 ```csharp
-var metrics = await client.GetPspDetailsAsync("Adyen");
+var metrics = await client.GetPspDetails("Adyen");
 if (metrics != null)
 {
     Console.WriteLine($"Auth Rate (30d): {metrics.AuthRate30d:F2}%");
@@ -156,10 +156,10 @@ if (metrics != null)
 
 ```csharp
 // Get PSPs that support 3DS for high-risk transactions
-var threeDSPsps = await client.Get3DSCapablePspsAsync();
+var threeDSPsps = await client.Get3DSCapablePsps();
 
 // Get PSPs for specific currency and payment method
-var usdCardPsps = await client.GetPspsForTransactionAsync(currencyId: 1, paymentMethodId: 1);
+var usdCardPsps = await client.GetPspsForTransaction(currencyId: 1, paymentMethodId: 1);
 ```
 
 ### Batch Processing
@@ -174,7 +174,7 @@ var transactions = new[]
 var decisions = new List<RouteDecision>();
 foreach (var transaction in transactions)
 {
-    var decision = await client.MakeDeterministicDecisionAsync(transaction);
+    var decision = await client.MakeDeterministicDecision(transaction);
     decisions.Add(decision);
 }
 ```
@@ -218,7 +218,7 @@ All methods throw exceptions for database connection issues, invalid parameters,
 ```csharp
 try
 {
-    var psps = await client.GetAvailablePspsAsync();
+    var psps = await client.GetAvailablePsps();
 }
 catch (SqlException ex)
 {

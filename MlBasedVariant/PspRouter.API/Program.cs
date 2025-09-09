@@ -94,7 +94,7 @@ builder.Services.AddSingleton<IPredictionService>(provider =>
     {
         try
         {
-            await service.LoadModelAsync();
+            await service.LoadModel();
             logger.LogInformation("ML model loaded successfully during startup");
         }
         catch (Exception ex)

@@ -12,12 +12,12 @@ public interface IPspDataProvider
     /// <summary>
     /// Gets all available PSPs with their current performance metrics
     /// </summary>
-    Task<List<PspSnapshot>> GetAvailablePspsAsync(CancellationToken ct = default);
+    Task<List<PspSnapshot>> GetAvailablePsps(CancellationToken ct = default);
     
     /// <summary>
     /// Gets PSPs filtered by specific criteria (currency, payment method, etc.)
     /// </summary>
-    Task<List<PspSnapshot>> GetFilteredPspsAsync(
+    Task<List<PspSnapshot>> GetFilteredPsps(
         long? currencyId = null, 
         long? paymentMethodId = null, 
         bool? supports3DS = null,
@@ -26,7 +26,7 @@ public interface IPspDataProvider
     /// <summary>
     /// Gets detailed performance metrics for a specific PSP
     /// </summary>
-    Task<PspPerformanceMetrics?> GetPspPerformanceAsync(string pspName, CancellationToken ct = default);
+    Task<PspPerformanceMetrics?> GetPspPerformance(string pspName, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -50,12 +50,12 @@ public class PspDataProvider : IPspDataProvider
         _logger = logger;
     }
 
-    public async Task<List<PspSnapshot>> GetAvailablePspsAsync(CancellationToken ct = default)
+    public async Task<List<PspSnapshot>> GetAvailablePsps(CancellationToken ct = default)
     {
-        return await GetFilteredPspsAsync(ct: ct);
+        return await GetFilteredPsps(ct: ct);
     }
 
-    public async Task<List<PspSnapshot>> GetFilteredPspsAsync(
+    public async Task<List<PspSnapshot>> GetFilteredPsps(
         long? currencyId = null, 
         long? paymentMethodId = null, 
         bool? supports3DS = null,
@@ -92,7 +92,7 @@ public class PspDataProvider : IPspDataProvider
         }
     }
 
-    public async Task<PspPerformanceMetrics?> GetPspPerformanceAsync(string pspName, CancellationToken ct = default)
+    public async Task<PspPerformanceMetrics?> GetPspPerformance(string pspName, CancellationToken ct = default)
     {
         try
         {

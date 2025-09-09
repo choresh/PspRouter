@@ -20,11 +20,11 @@ public class PspRouterClient
     /// <summary>
     /// Gets all available PSPs with their current performance metrics
     /// </summary>
-    public async Task<List<PspSnapshot>> GetAvailablePspsAsync(CancellationToken ct = default)
+    public async Task<List<PspSnapshot>> GetAvailablePsps(CancellationToken ct = default)
     {
         try
         {
-            var psps = await _pspProvider.GetAvailablePspsAsync(ct);
+            var psps = await _pspProvider.GetAvailablePsps(ct);
             _logger?.LogInformation("Retrieved {Count} available PSPs", psps.Count);
             return psps;
         }
@@ -38,14 +38,14 @@ public class PspRouterClient
     /// <summary>
     /// Gets PSPs filtered by currency and payment method
     /// </summary>
-    public async Task<List<PspSnapshot>> GetPspsForTransactionAsync(
+    public async Task<List<PspSnapshot>> GetPspsForTransaction(
         long currencyId, 
         long paymentMethodId, 
         CancellationToken ct = default)
     {
         try
         {
-            var psps = await _pspProvider.GetFilteredPspsAsync(
+            var psps = await _pspProvider.GetFilteredPsps(
                 currencyId: currencyId,
                 paymentMethodId: paymentMethodId,
                 ct: ct
@@ -66,11 +66,11 @@ public class PspRouterClient
     /// <summary>
     /// Gets PSPs that support 3DS for high-risk transactions
     /// </summary>
-    public async Task<List<PspSnapshot>> Get3DSCapablePspsAsync(CancellationToken ct = default)
+    public async Task<List<PspSnapshot>> Get3DSCapablePsps(CancellationToken ct = default)
     {
         try
         {
-            var psps = await _pspProvider.GetFilteredPspsAsync(supports3DS: true, ct: ct);
+            var psps = await _pspProvider.GetFilteredPsps(supports3DS: true, ct: ct);
             
             _logger?.LogInformation("Retrieved {Count} PSPs with 3DS support", psps.Count);
             
@@ -86,11 +86,11 @@ public class PspRouterClient
     /// <summary>
     /// Gets detailed performance metrics for a specific PSP
     /// </summary>
-    public async Task<PspPerformanceMetrics?> GetPspDetailsAsync(string pspName, CancellationToken ct = default)
+    public async Task<PspPerformanceMetrics?> GetPspDetails(string pspName, CancellationToken ct = default)
     {
         try
         {
-            var metrics = await _pspProvider.GetPspPerformanceAsync(pspName, ct);
+            var metrics = await _pspProvider.GetPspPerformance(pspName, ct);
             
             if (metrics != null)
             {
@@ -114,12 +114,12 @@ public class PspRouterClient
     /// <summary>
     /// Builds a route context with PSPs filtered by transaction requirements
     /// </summary>
-    public async Task<RouteContext> BuildRouteContextAsync(RouteInput transaction, CancellationToken ct = default)
+    public async Task<RouteContext> BuildRouteContext(RouteInput transaction, CancellationToken ct = default)
     {
         try
         {
             // Get PSPs filtered by transaction requirements
-            var candidates = await _pspProvider.GetFilteredPspsAsync(
+            var candidates = await _pspProvider.GetFilteredPsps(
                 currencyId: transaction.CurrencyId,
                 paymentMethodId: transaction.PaymentMethodId,
                 supports3DS: transaction.SCARequired ? true : null,
@@ -146,7 +146,7 @@ public class PspRouterClient
     /// <summary>
     /// Makes a routing decision using a fine-tuned model (requires external model service)
     /// </summary>
-    public async Task<RouteDecision> MakeRoutingDecisionAsync(
+    public async Task<RouteDecision> MakeRoutingDecision(
         RouteInput transaction, 
         string modelApiUrl, 
         string apiKey,
@@ -155,7 +155,7 @@ public class PspRouterClient
         try
         {
             // Build route context with real-time PSP data
-            var context = await BuildRouteContextAsync(transaction, ct);
+            var context = await BuildRouteContext(transaction, ct);
 
             if (context.Candidates.Count == 0)
             {
@@ -163,7 +163,7 @@ public class PspRouterClient
             }
 
             // Call external fine-tuned model service
-            var decision = await CallFineTunedModelAsync(context, modelApiUrl, apiKey, ct);
+            var decision = await CallFineTunedModel(context, modelApiUrl, apiKey, ct);
 
             _logger?.LogInformation("Routing decision made: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
             
@@ -179,7 +179,7 @@ public class PspRouterClient
     /// <summary>
     /// Prepares candidates and calls the PspRouter.API for routing decision
     /// </summary>
-    public async Task<RouteDecision> MakeDeterministicDecisionAsync(
+    public async Task<RouteDecision> MakeDeterministicDecision(
         RouteInput transaction, 
         string apiBaseUrl, 
         CancellationToken ct = default)
@@ -187,7 +187,7 @@ public class PspRouterClient
         try
         {
             // Build route context with real-time PSP data
-            var context = await BuildRouteContextAsync(transaction, ct);
+            var context = await BuildRouteContext(transaction, ct);
 
             if (context.Candidates.Count == 0)
             {
@@ -195,7 +195,7 @@ public class PspRouterClient
             }
 
             // Call the PspRouter.API
-            var decision = await CallPspRouterApiAsync(context, apiBaseUrl, ct);
+            var decision = await CallPspRouterApi(context, apiBaseUrl, ct);
 
             _logger?.LogInformation("API routing decision: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
             
@@ -208,7 +208,7 @@ public class PspRouterClient
         }
     }
 
-    private async Task<RouteDecision> CallPspRouterApiAsync(
+    private async Task<RouteDecision> CallPspRouterApi(
         RouteContext context, 
         string apiBaseUrl, 
         CancellationToken ct)
@@ -239,7 +239,7 @@ public class PspRouterClient
         return decision;
     }
 
-    private async Task<RouteDecision> CallFineTunedModelAsync(
+    private async Task<RouteDecision> CallFineTunedModel(
         RouteContext context, 
         string modelApiUrl, 
         string apiKey, 

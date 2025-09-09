@@ -34,7 +34,7 @@ var context = {
 };
 
 // Fine-tuned model makes intelligent decision using learned patterns
-var decision = await fineTunedModel.CompleteJsonAsync(systemPrompt, userInstruction, context);
+var decision = await fineTunedModel.CompleteJson(systemPrompt, userInstruction, context);
 // Result: {"schema_version":"1.0","decision_id":"route_001","candidate":"Stripe","alternates":["Adyen"],"reasoning":"Best for high-risk SCA transactions based on historical data","guardrail":"none","constraints":{"must_use_3ds":true,"retry_window_ms":8000,"max_retries":1},"features_used":["sca_required=true","auth_rate=0.89"]}
 ```
 
@@ -411,19 +411,19 @@ var trainingExample = new {
 #### **1. Data Upload**
 ```csharp
 // Upload training data to OpenAI
-var fileId = await trainingService.UploadFileToOpenAIAsync(trainingDataJsonl);
+var fileId = await trainingService.UploadFileToOpenAI(trainingDataJsonl);
 ```
 
 #### **2. Fine-Tuning Job Creation**
 ```csharp
 // Create fine-tuning job
-var jobId = await trainingService.CreateFineTuningJobViaHttpAsync(fileId);
+var jobId = await trainingService.CreateFineTuningJobViaHttp(fileId);
 ```
 
 #### **3. Training Monitoring**
 ```csharp
 // Monitor training progress
-var jobStatus = await trainingService.GetFineTuningJobDetailsAsync(jobId);
+var jobStatus = await trainingService.GetFineTuningJobDetails(jobId);
 // Status: "validating_files" → "queued" → "running" → "succeeded"
 ```
 
