@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>PspRouter.Client</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>PspRouter Team</Authors>
+    <Description>A .NET client library for PSP (Payment Service Provider) routing with real-time database access</Description>
+    <PackageTags>payment;routing;psp;fintech</PackageTags>
+    <RepositoryUrl>https://github.com/your-org/PspRouter</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.8" />
+  </ItemGroup>
+
+</Project>
