@@ -20,11 +20,11 @@ public class FeatureExtractor
     /// <summary>
     /// Extract features from training data
     /// </summary>
-    public IEnumerable<RoutingTrainingExample> ExtractFeatures(IEnumerable<TrainingData> trainingData)
+    public IEnumerable<RoutingFeatures> ExtractFeatures(IEnumerable<TrainingData> trainingData)
     {
         _logger.LogInformation("Extracting features from {Count} training records", trainingData.Count());
         
-        var examples = new List<RoutingTrainingExample>();
+        var examples = new List<RoutingFeatures>();
         
         foreach (var data in trainingData)
         {
@@ -46,7 +46,7 @@ public class FeatureExtractor
         return examples;
     }
 
-    private RoutingTrainingExample? ExtractFeaturesFromTransaction(TrainingData data)
+    private RoutingFeatures? ExtractFeaturesFromTransaction(TrainingData data)
     {
         // Get PSP metadata
         if (!_pspMetadata.TryGetValue(data.PaymentGatewayId, out var pspMeta))
@@ -71,7 +71,7 @@ public class FeatureExtractor
         var hourOfDay = data.DateCreated.Hour;
         var dayOfWeek = (int)data.DateCreated.DayOfWeek;
 
-        var features = new RoutingFeatures
+        return new RoutingFeatures
         {
             // Transaction features
             Amount = amount,
@@ -97,12 +97,9 @@ public class FeatureExtractor
             ComplianceScore = complianceScore,
             AmountLog = amountLog,
             HourOfDay = hourOfDay,
-            DayOfWeek = dayOfWeek
-        };
-
-        return new RoutingTrainingExample
-        {
-            Features = features,
+            DayOfWeek = dayOfWeek,
+            
+            // Labels
             IsSuccessful = isSuccessful,
             SuccessScore = isSuccessful ? 1f : 0f,
             CostScore = CalculateCostScore(amount, pspMeta.FeeBps, pspMeta.FixedFee),

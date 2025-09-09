@@ -30,11 +30,11 @@ public class TrainingService : ITrainingService
         
         try
         {
-            // 1. Upload training data
+        // 1. Upload training data
             _logger.LogInformation("Step 1: Uploading training data...");
             var fileId = await UploadTrainingDataAsync(cancellationToken);
             
-            // 2. Create fine-tuning job
+        // 2. Create fine-tuning job
             _logger.LogInformation("Step 2: Creating fine-tuning job...");
             var jobId = await CreateFineTuningJob(fileId, cancellationToken);
             

@@ -66,10 +66,11 @@ public class TrainingService : ITrainingService
             var pipeline = CreateTrainingPipeline();
             var trainedModel = pipeline.Fit(trainTestSplit.TrainSet);
             
-            // 6. Evaluate the model
-            _logger.LogInformation("Step 6: Evaluating model...");
-            var predictions = trainedModel.Transform(trainTestSplit.TestSet);
-            var metrics = _mlContext.BinaryClassification.Evaluate(predictions);
+        // 6. Evaluate the model
+        _logger.LogInformation("Step 6: Evaluating model...");
+        var predictions = trainedModel.Transform(trainTestSplit.TestSet);
+        var metrics = _mlContext.BinaryClassification.Evaluate(predictions, 
+            labelColumnName: nameof(RoutingFeatures.IsSuccessful));
             
             _logger.LogInformation("Model training completed successfully!");
             _logger.LogInformation("Accuracy: {Accuracy:F4}", metrics.Accuracy);
@@ -173,7 +174,7 @@ public class TrainingService : ITrainingService
         return _mlContext.Transforms.Concatenate("Features", featureColumns)
             .Append(_mlContext.Transforms.NormalizeMinMax("Features"))
             .Append(_mlContext.BinaryClassification.Trainers.LightGbm(
-                labelColumnName: nameof(RoutingTrainingExample.IsSuccessful),
+                labelColumnName: nameof(RoutingFeatures.IsSuccessful),
                 featureColumnName: "Features",
                 numberOfLeaves: _config.NumLeaves,
                 minimumExampleCountPerLeaf: _config.MinDataInLeaf,
