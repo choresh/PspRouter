@@ -19,7 +19,7 @@ public sealed class OpenAIChatClient : IChatClient
     }
 
     public async Task<string> CompleteJson(string systemPrompt, string userInstruction, string contextJson,
-        IEnumerable<IAgentTool> tools, double temperature, CancellationToken ct)
+        double temperature, CancellationToken ct)
     {
         var messages = new List<object> {
             new { role = "system", content = systemPrompt },
@@ -27,14 +27,7 @@ public sealed class OpenAIChatClient : IChatClient
             new { role = "system", content = contextJson }
         };
 
-        var toolDefs = tools.Select(t => new {
-            type = "function",
-            function = new {
-                name = t.Name,
-                description = "tool",
-                parameters = JsonDocument.Parse(t.JsonSchema).RootElement
-            }
-        }).ToList();
+        // Tools removed - fine-tuned model learns everything from historical data
 
         while (true)
         {
@@ -43,9 +36,7 @@ public sealed class OpenAIChatClient : IChatClient
                 model = _model,
                 temperature,
                 messages,
-                response_format = new { type = "json_object" },
-                tools = toolDefs.Count == 0 ? null : toolDefs,
-                tool_choice = toolDefs.Count == 0 ? null : "auto"
+                response_format = new { type = "json_object" }
             };
 
             using var req = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
@@ -63,26 +54,7 @@ public sealed class OpenAIChatClient : IChatClient
             var choice = doc.RootElement.GetProperty("choices")[0];
             var message = choice.GetProperty("message");
 
-            if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array && toolCalls.GetArrayLength() > 0)
-            {
-                foreach (var call in toolCalls.EnumerateArray())
-                {
-                    var id = call.GetProperty("id").GetString() ?? "";
-                    var name = call.GetProperty("function").GetProperty("name").GetString() ?? "";
-                    var argsJson = call.GetProperty("function").GetProperty("arguments").GetString() ?? "{}";
-
-                    var tool = tools.FirstOrDefault(t => t.Name == name);
-                    string toolResult = "{\"ok\":false,\"error\":\"unknown tool\"}";
-                    if (tool is not null)
-                    {
-                        toolResult = await tool.Invoke(argsJson, ct);
-                    }
-
-                    messages.Add(new { role = "tool", content = toolResult, tool_call_id = id });
-                }
-                // continue the loop to let the model observe tool results
-                continue;
-            }
+            // Tool calling logic removed - fine-tuned model doesn't need tools
 
             var content = message.GetProperty("content").GetString() ?? "{}";
             return content;

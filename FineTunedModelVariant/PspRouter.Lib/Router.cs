@@ -6,15 +6,11 @@ namespace PspRouter.Lib;
 public sealed class PspRouter
 {
     private readonly IChatClient _chat;
-    private readonly IEnumerable<IAgentTool> _tools;
-    private readonly IHealthProvider _health;
-    private readonly IFeeQuoteProvider _fees;
     private readonly ILogger<PspRouter>? _logger;
 
-    public PspRouter(IChatClient chat, IHealthProvider health, IFeeQuoteProvider fees,
-                     IEnumerable<IAgentTool>? tools = null, ILogger<PspRouter>? logger = null)
+    public PspRouter(IChatClient chat, ILogger<PspRouter>? logger = null)
     {
-        _chat = chat; _health = health; _fees = fees; _tools = tools ?? Array.Empty<IAgentTool>();
+        _chat = chat; 
         _logger = logger;
     }
 
@@ -76,7 +72,7 @@ public sealed class PspRouter
         var systemPrompt = BuildSystemPrompt();
         var userInstruction = $"Route this payment transaction to the optimal PSP. Consider auth rates, fees, compliance requirements, and historical lessons.";
 
-        var response = await _chat.CompleteJson(systemPrompt, userInstruction, contextJson, _tools, 0.1, ct);
+        var response = await _chat.CompleteJson(systemPrompt, userInstruction, contextJson, 0.1, ct);
         
         try
         {

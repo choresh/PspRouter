@@ -5,26 +5,16 @@ namespace PspRouter.Tests;
 
 public class IntegrationTests
 {
-    private readonly ICapabilityProvider capability = new API.DummyCapabilityProvider();
-
     [Fact]
     public async Task TestCompleteRoutingFlow()
     {
         // This test demonstrates the complete PSP routing system
         
         // Arrange - Create mock services
-        var healthProvider = new API.DummyHealthProvider();
-        var feeProvider = new API.DummyFeeProvider();
         var chatClient = new API.DummyChatClient();
         var logger = new MockLogger<Lib.PspRouter>();
-        
-        var tools = new List<IAgentTool>
-        {
-            new GetHealthTool(healthProvider),
-            new GetFeeQuoteTool(feeProvider, () => new RouteInput("", "", "", 1, 0, 1))
-        };
 
-        var router = new Lib.PspRouter(chatClient, healthProvider, feeProvider, tools, logger);
+        var router = new Lib.PspRouter(chatClient, logger);
 
         // Test multiple transactions to demonstrate learning
         var testTransactions = new[]
@@ -42,7 +32,7 @@ public class IntegrationTests
             var tx = testTransactions[i];
             
             // Build context
-            var candidates = await BuildCandidates(tx, healthProvider);
+            var candidates = await BuildCandidates(tx);
             var prefs = new Dictionary<string, string> { ["prefer_low_fees"] = "true" };
             var stats = new Dictionary<string, double>
             {
@@ -70,30 +60,17 @@ public class IntegrationTests
         }
     }
 
-    private async Task<List<PspSnapshot>> BuildCandidates(RouteInput tx, IHealthProvider health)
+    private Task<List<PspSnapshot>> BuildCandidates(RouteInput tx)
     {
         var candidates = new List<PspSnapshot>();
         
-        // Add supported PSPs based on capability matrix
-        if (this.capability.Supports("Adyen", tx))
-        {
-            var (healthStatus, latency) = await health.Get("Adyen", CancellationToken.None);
-            candidates.Add(new("Adyen", true, healthStatus, GetRealisticAuthRate(tx, "Adyen"), latency, GetRealisticFeeBps(tx, "Adyen"), true, true));
-        }
+        // Add all PSPs - fine-tuned model will learn which ones are appropriate
+        // This simulates the model learning from historical data
+        candidates.Add(new("Adyen", true, "green", GetRealisticAuthRate(tx, "Adyen"), 100, GetRealisticFeeBps(tx, "Adyen"), true, true));
+        candidates.Add(new("Stripe", true, "green", GetRealisticAuthRate(tx, "Stripe"), 120, GetRealisticFeeBps(tx, "Stripe"), true, true));
+        candidates.Add(new("Klarna", true, "green", GetRealisticAuthRate(tx, "Klarna"), 150, GetRealisticFeeBps(tx, "Klarna"), true, true));
         
-        if (capability.Supports("Stripe", tx))
-        {
-            var (healthStatus, latency) = await health.Get("Stripe", CancellationToken.None);
-            candidates.Add(new("Stripe", true, healthStatus, GetRealisticAuthRate(tx, "Stripe"), latency, GetRealisticFeeBps(tx, "Stripe"), true, true));
-        }
-        
-        if (capability.Supports("Klarna", tx))
-        {
-            var (healthStatus, latency) = await health.Get("Klarna", CancellationToken.None);
-            candidates.Add(new("Klarna", true, healthStatus, GetRealisticAuthRate(tx, "Klarna"), latency, GetRealisticFeeBps(tx, "Klarna"), true, true));
-        }
-        
-        return candidates;
+        return Task.FromResult(candidates);
     }
 
     private int GetRealisticFeeBps(RouteInput tx, string psp)

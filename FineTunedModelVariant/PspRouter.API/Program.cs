@@ -85,9 +85,6 @@ var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new I
 var ftModel = Environment.GetEnvironmentVariable("OPENAI_FT_MODEL") ?? throw new InvalidOperationException("OPENAI_FT_MODEL environment variable is required");
 
 // === Register Core Services ===
-builder.Services.AddSingleton<ICapabilityProvider, PspRouter.API.DummyCapabilityProvider>();
-builder.Services.AddSingleton<IHealthProvider, PspRouter.API.DummyHealthProvider>();
-builder.Services.AddSingleton<IFeeQuoteProvider, PspRouter.API.DummyFeeProvider>();
 builder.Services.AddSingleton<IChatClient>(provider => 
     new OpenAIChatClient(apiKey, model: ftModel));
 
@@ -95,18 +92,9 @@ builder.Services.AddSingleton<IChatClient>(provider =>
 builder.Services.AddScoped(provider =>
 {
     var chat = provider.GetRequiredService<IChatClient>();
-    var health = provider.GetRequiredService<IHealthProvider>();
-    var fees = provider.GetRequiredService<IFeeQuoteProvider>();
-    var capability = provider.GetRequiredService<ICapabilityProvider>();
     var logger = provider.GetRequiredService<ILogger<PspRouter.Lib.PspRouter>>();
     
-    var tools = new List<IAgentTool>
-    {
-        new GetHealthTool(health),
-        new GetFeeQuoteTool(fees, () => new RouteInput("", "", "", 0, 0, 0))
-    };
-
-    return new PspRouter.Lib.PspRouter(chat, health, fees, tools, logger);
+    return new PspRouter.Lib.PspRouter(chat, logger);
 });
 
 var app = builder.Build();
