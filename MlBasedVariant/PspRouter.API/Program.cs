@@ -69,7 +69,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     var assembly = Assembly.GetExecutingAssembly();
-    var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+    var version = assembly.GetName().Version?.ToString() ?? throw new InvalidOperationException("Assembly version is required");
     var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
     
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -80,22 +80,14 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Get .env file variables
-var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
-var ftModel = Environment.GetEnvironmentVariable("OPENAI_FT_MODEL") ?? throw new InvalidOperationException("OPENAI_FT_MODEL environment variable is required");
-
 // Get ML model path from configuration
-var mlModelPath = builder.Configuration["ML:ModelPath"] ?? "models/psp_routing_model.zip";
-
-// === Register Core Services ===
-builder.Services.AddSingleton<IChatClient>(provider => 
-    new OpenAIChatClient(apiKey, model: ftModel));
+var mlModelPath = builder.Configuration["ML:ModelPath"] ?? throw new InvalidOperationException("ML:ModelPath environment variable is required");
 
 // === Register ML Services ===
-builder.Services.AddSingleton<IMLPredictionService>(provider =>
+builder.Services.AddSingleton<IPredictionService>(provider =>
 {
-    var logger = provider.GetRequiredService<ILogger<MLPredictionService>>();
-    var service = new MLPredictionService(logger, mlModelPath);
+    var logger = provider.GetRequiredService<ILogger<PredictionService>>();
+    var service = new PredictionService(logger, mlModelPath);
     
     // Load the model asynchronously on startup
     _ = Task.Run(async () =>
@@ -114,30 +106,20 @@ builder.Services.AddSingleton<IMLPredictionService>(provider =>
     return service;
 });
 
-// === Register Routers ===
-// Original LLM-based router
+// === Register PSP Candidate Provider ===
+builder.Services.AddSingleton<IPspCandidateProvider, PspCandidateProvider>();
+
+// === Register ML Router ===
 builder.Services.AddScoped(provider =>
 {
-    var chat = provider.GetRequiredService<IChatClient>();
-    var logger = provider.GetRequiredService<ILogger<PspRouter.Lib.PspRouter>>();
+    var predictionService = provider.GetRequiredService<IPredictionService>();
+    var candidateProvider = provider.GetRequiredService<IPspCandidateProvider>();
+    var logger = provider.GetRequiredService<ILogger<Router>>();
 
     var routingSettings = new RoutingSettings();
     builder.Configuration.GetSection("PspRouter:Routing").Bind(routingSettings);
     
-    return new PspRouter.Lib.PspRouter(chat, logger, routingSettings);
-});
-
-// ML-based router with LLM fallback
-builder.Services.AddScoped(provider =>
-{
-    var mlService = provider.GetRequiredService<IMLPredictionService>();
-    var chat = provider.GetRequiredService<IChatClient>();
-    var logger = provider.GetRequiredService<ILogger<MLBasedRouter>>();
-
-    var routingSettings = new RoutingSettings();
-    builder.Configuration.GetSection("PspRouter:Routing").Bind(routingSettings);
-    
-    return new MLBasedRouter(mlService, chat, logger, routingSettings);
+    return new Router(predictionService, candidateProvider, logger, routingSettings);
 });
 
 var app = builder.Build();
@@ -161,7 +143,7 @@ Console.WriteLine("  POST /api/v1/routing/route - Route a transaction");
 Console.WriteLine("  GET  /api/v1/routing/health - Check service health");
 
 // Get URLs from configuration
-var urls = builder.Configuration["urls"] ?? "http://localhost:5174;https://localhost:7149";
+var urls = builder.Configuration["urls"] ?? throw new InvalidOperationException("urls environment variable is required");
 var urlList = urls.Split(';', StringSplitOptions.RemoveEmptyEntries);
 
 // Print the URLs to console and logs

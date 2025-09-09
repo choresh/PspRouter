@@ -38,8 +38,6 @@ This document outlines all the components that need to be implemented to complet
 ## 🚀 **Phase 1: Core Functionality**
 
 ### 1. **Environment Configuration** ⚠️ **REQUIRED**
-- [ ] Set valid OPENAI_API_KEY at your 2 `.env` files
-- [ ] Verify OpenAI API key has sufficient credits and access to fine-tuning
 - [ ] Set database connection string `PSPROUTER_DB_CONNECTION` in `.env`
 
 #### ML-Based Setup

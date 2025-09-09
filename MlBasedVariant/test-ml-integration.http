@@ -10,61 +10,7 @@ Content-Type: application/json
 
 ###
 
-### Test ML-based Routing
-POST http://localhost:5174/api/v1/routing/route-ml
-Content-Type: application/json
-
-{
-  "transaction": {
-    "merchantId": "TEST_MERCHANT_001",
-    "buyerCountry": "US",
-    "merchantCountry": "US",
-    "currencyId": 1,
-    "amount": 100.50,
-    "paymentMethodId": 1,
-    "paymentCardBin": "411111",
-    "threeDSTypeId": 1,
-    "isTokenized": false,
-    "scaRequired": true,
-    "riskScore": 25
-  },
-  "candidates": [
-    {
-      "name": "PSP_A",
-      "supports": true,
-      "health": "green",
-      "authRate30d": 0.92,
-      "feeBps": 100,
-      "fixedFee": 0.10,
-      "supports3DS": true,
-      "tokenization": true
-    },
-    {
-      "name": "PSP_B",
-      "supports": true,
-      "health": "yellow",
-      "authRate30d": 0.88,
-      "feeBps": 120,
-      "fixedFee": 0.15,
-      "supports3DS": false,
-      "tokenization": true
-    },
-    {
-      "name": "PSP_C",
-      "supports": true,
-      "health": "green",
-      "authRate30d": 0.95,
-      "feeBps": 80,
-      "fixedFee": 0.05,
-      "supports3DS": true,
-      "tokenization": false
-    }
-  ]
-}
-
-###
-
-### Test LLM-based Routing (for comparison)
+### Test ML-based Routing (Simplified - no candidates needed)
 POST http://localhost:5174/api/v1/routing/route
 Content-Type: application/json
 
@@ -81,37 +27,30 @@ Content-Type: application/json
     "isTokenized": false,
     "scaRequired": true,
     "riskScore": 25
-  },
-  "candidates": [
-    {
-      "name": "PSP_A",
-      "supports": true,
-      "health": "green",
-      "authRate30d": 0.92,
-      "feeBps": 100,
-      "fixedFee": 0.10,
-      "supports3DS": true,
-      "tokenization": true
-    },
-    {
-      "name": "PSP_B",
-      "supports": true,
-      "health": "yellow",
-      "authRate30d": 0.88,
-      "feeBps": 120,
-      "fixedFee": 0.15,
-      "supports3DS": false,
-      "tokenization": true
-    },
-    {
-      "name": "PSP_C",
-      "supports": true,
-      "health": "green",
-      "authRate30d": 0.95,
-      "feeBps": 80,
-      "fixedFee": 0.05,
-      "supports3DS": true,
-      "tokenization": false
-    }
-  ]
+  }
 }
+
+###
+
+### Submit Feedback for Learning
+POST http://localhost:5174/api/v1/routing/feedback
+Content-Type: application/json
+
+{
+  "decisionId": "test-decision-001",
+  "merchantId": "TEST_MERCHANT_001",
+  "pspName": "PSP_A",
+  "authorized": true,
+  "transactionAmount": 100.50,
+  "feeAmount": 0.20,
+  "processingTimeMs": 1250,
+  "riskScore": 25,
+  "processedAt": "2025-01-09T20:15:00Z",
+  "routingMethod": "ml"
+}
+
+###
+
+### Get Current PSP Candidates and Performance
+GET http://localhost:5174/api/v1/routing/candidates
+Content-Type: application/json

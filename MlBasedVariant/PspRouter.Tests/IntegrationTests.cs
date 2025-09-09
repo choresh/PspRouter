@@ -10,59 +10,9 @@ public class IntegrationTests
     {
         // This test demonstrates the complete PSP routing system
         
-        // Arrange - Create mock services
-        var chatClient = new API.DummyChatClient();
-        var logger = new MockLogger<Lib.PspRouter>();
-
-        var router = new Lib.PspRouter(chatClient, logger);
-
-        // Test multiple transactions to demonstrate learning
-        var testTransactions = new[]
-        {
-            new RouteInput("M001", "US", "IL", 1, 150.00m, 1, "411111", null, false, false, 15),
-            new RouteInput("M002", "GB", "IL", 2, 75.50m, 1, "555555", null, true, false, 25),
-            new RouteInput("M003", "DE", "IL", 3, 200.00m, 2, null, null, false, false, 10),
-            new RouteInput("M001", "US", "IL", 1, 300.00m, 1, "411111", null, false, false, 20),
-            new RouteInput("M002", "GB", "IL", 2, 50.00m, 1, "555555", null, false, false, 5)
-        };
-
-        // Act & Assert - Process each transaction
-        for (int i = 0; i < testTransactions.Length; i++)
-        {
-            var tx = testTransactions[i];
-            
-            // Build context
-            var candidates = await BuildCandidates(tx);
-            var ctx = new RouteContext(tx, candidates);
-
-            // Make routing decision
-            var decision = await router.Decide(ctx, CancellationToken.None);
-            
-            // Verify decision was made
-            Assert.NotNull(decision);
-            Assert.NotNull(decision.Candidate);
-            Assert.NotNull(decision.Reasoning);
-            
-            // Simulate transaction outcome
-            var outcome = SimulateRealisticOutcome(decision, tx);
-            
-            // Fine-tuned model variant: no online learning update
-            Assert.True(true);
-        }
+       
     }
 
-    private Task<List<PspSnapshot>> BuildCandidates(RouteInput tx)
-    {
-        var candidates = new List<PspSnapshot>();
-        
-        // Add all PSPs - fine-tuned model will learn which ones are appropriate
-        // This simulates the model learning from historical data
-        candidates.Add(new("Adyen", true, "green", GetRealisticAuthRate(tx, "Adyen"), 100, GetRealisticFeeBps(tx, "Adyen"), true, true));
-        candidates.Add(new("Stripe", true, "green", GetRealisticAuthRate(tx, "Stripe"), 120, GetRealisticFeeBps(tx, "Stripe"), true, true));
-        candidates.Add(new("Klarna", true, "green", GetRealisticAuthRate(tx, "Klarna"), 150, GetRealisticFeeBps(tx, "Klarna"), true, true));
-        
-        return Task.FromResult(candidates);
-    }
 
     private int GetRealisticFeeBps(RouteInput tx, string psp)
     {

@@ -9,69 +9,33 @@ namespace PspRouter.API.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class RoutingController : ControllerBase
 {
-    private readonly Lib.PspRouter _router;
-    private readonly MLBasedRouter _mlRouter;
-    private readonly IMLPredictionService _mlPredictionService;
+    private readonly Router _router;
+    private readonly IPredictionService _predictionService;
+    private readonly IPspCandidateProvider _candidateProvider;
     private readonly ILogger<RoutingController> _logger;
 
-    public RoutingController(Lib.PspRouter router, MLBasedRouter mlRouter, IMLPredictionService mlPredictionService, ILogger<RoutingController> logger)
+    public RoutingController(Router router, IPredictionService predictionService, IPspCandidateProvider candidateProvider, ILogger<RoutingController> logger)
     {
         _router = router;
-        _mlRouter = mlRouter;
-        _mlPredictionService = mlPredictionService;
+        _predictionService = predictionService;
+        _candidateProvider = candidateProvider;
         _logger = logger;
     }
 
     /// <summary>
-    /// Route a payment transaction to the best PSP using LLM-based routing
+    /// Route a payment transaction to the best PSP using ML-based routing
     /// </summary>
-    /// <param name="request">Routing request containing transaction details and candidates</param>
+    /// <param name="request">Simplified routing request containing only transaction details</param>
     /// <returns>Routing decision with selected PSP and reasoning</returns>
     [HttpPost("route")]
-    public async Task<ActionResult<RouteDecision>> RouteTransaction([FromBody] RouteRequest request)
-    {
-        try
-        {
-            _logger.LogInformation("Processing LLM routing request for merchant {MerchantId}, amount {Amount} {CurrencyId}", 
-                request.Transaction.MerchantId, request.Transaction.Amount, request.Transaction.CurrencyId);
-
-            var context = new Lib.RouteContext(
-                request.Transaction,
-                request.Candidates
-            );
-
-            var decision = await _router.Decide(context, CancellationToken.None);
-
-            _logger.LogInformation("LLM routing decision made: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
-
-            return Ok(decision);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing LLM routing request");
-            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Route a payment transaction to the best PSP using ML-based routing with LLM fallback
-    /// </summary>
-    /// <param name="request">Routing request containing transaction details and candidates</param>
-    /// <returns>Routing decision with selected PSP and reasoning</returns>
-    [HttpPost("route-ml")]
-    public async Task<ActionResult<RouteDecision>> RouteTransactionML([FromBody] RouteRequest request)
+    public async Task<ActionResult<RouteDecision>> RouteTransaction([FromBody] SimpleRouteRequest request)
     {
         try
         {
             _logger.LogInformation("Processing ML routing request for merchant {MerchantId}, amount {Amount} {CurrencyId}", 
                 request.Transaction.MerchantId, request.Transaction.Amount, request.Transaction.CurrencyId);
 
-            var context = new Lib.RouteContext(
-                request.Transaction,
-                request.Candidates
-            );
-
-            var decision = await _mlRouter.Decide(context, CancellationToken.None);
+            var decision = await _router.Decide(request.Transaction, CancellationToken.None);
 
             _logger.LogInformation("ML routing decision made: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
 
@@ -84,7 +48,83 @@ public class RoutingController : ControllerBase
         }
     }
 
-    
+    /// <summary>
+    /// Submit feedback about transaction execution results for learning
+    /// </summary>
+    /// <param name="feedback">Transaction execution feedback</param>
+    /// <returns>Confirmation of feedback processing</returns>
+    [HttpPost("feedback")]
+    public async Task<ActionResult<object>> SubmitFeedback([FromBody] TransactionFeedback feedback)
+    {
+        try
+        {
+            _logger.LogInformation("Processing feedback for decision {DecisionId}, PSP {PspName}, Authorized: {Authorized}", 
+                feedback.DecisionId, feedback.PspName, feedback.Authorized);
+
+            await _candidateProvider.ProcessFeedbackAsync(feedback, CancellationToken.None);
+
+            _logger.LogInformation("Feedback processed successfully for PSP {PspName}", feedback.PspName);
+
+            return Ok(new
+            {
+                status = "success",
+                message = "Feedback processed successfully",
+                decisionId = feedback.DecisionId,
+                pspName = feedback.PspName,
+                timestamp = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing feedback for decision {DecisionId}", feedback.DecisionId);
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get current PSP candidates and their performance metrics
+    /// </summary>
+    /// <returns>List of PSP candidates with performance data</returns>
+    [HttpGet("candidates")]
+    public async Task<ActionResult<object>> GetCandidates()
+    {
+        try
+        {
+            var candidates = await _candidateProvider.GetAllCandidatesAsync(CancellationToken.None);
+
+            var candidateData = candidates.Select(c => new
+            {
+                name = c.Name,
+                supports = c.Supports,
+                health = c.Health,
+                authRate30d = c.AuthRate30d,
+                currentAuthRate = c.CurrentAuthRate,
+                feeBps = c.FeeBps,
+                fixedFee = c.FixedFee,
+                supports3DS = c.Supports3DS,
+                tokenization = c.Tokenization,
+                performance = new
+                {
+                    totalTransactions = c.TotalTransactions,
+                    successfulTransactions = c.SuccessfulTransactions,
+                    averageProcessingTimeMs = c.AverageProcessingTime,
+                    lastUpdated = c.LastUpdated
+                }
+            });
+
+            return Ok(new
+            {
+                status = "success",
+                candidates = candidateData,
+                timestamp = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving PSP candidates");
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
 
     /// <summary>
     /// Get health status of the routing service
@@ -94,9 +134,9 @@ public class RoutingController : ControllerBase
     public ActionResult<object> GetHealth()
     {
         var assembly = Assembly.GetExecutingAssembly();
-        var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+        var version = assembly.GetName().Version?.ToString() ?? throw new InvalidOperationException("Assembly version is required");
         var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
-        
+
         return Ok(new
         {
             status = "healthy",
@@ -104,7 +144,7 @@ public class RoutingController : ControllerBase
             service = "PspRouter.API",
             version = informationalVersion,
             assemblyVersion = version,
-            apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0"
+            apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? throw new InvalidOperationException("API version is required")
         });
     }
 
@@ -116,7 +156,7 @@ public class RoutingController : ControllerBase
     public ActionResult<object> GetMLStatus()
     {
         var assembly = Assembly.GetExecutingAssembly();
-        var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+        var version = assembly.GetName().Version?.ToString() ?? throw new InvalidOperationException("Assembly version is required");
         var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
         
         return Ok(new
@@ -125,14 +165,14 @@ public class RoutingController : ControllerBase
             timestamp = DateTime.UtcNow,
             mlModel = new
             {
-                loaded = _mlPredictionService.IsModelLoaded,
+                loaded = _predictionService.IsModelLoaded,
                 version = "1.0",
                 type = "LightGBM",
                 description = "PSP routing success prediction model"
             },
             service = "PspRouter.API",
             version = informationalVersion,
-            apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0"
+            apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? throw new InvalidOperationException("API version is required")
         });
     }
 }

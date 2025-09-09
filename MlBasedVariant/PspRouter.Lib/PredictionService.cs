@@ -1,39 +1,25 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.ML;
-using System.Text.Json;
 
 namespace PspRouter.Lib;
 
 /// <summary>
-/// Service for making predictions using the trained ML model
-/// </summary>
-public interface IMLPredictionService
-{
-    Task<MLRoutingPrediction?> PredictBestPspAsync(RouteContext context, CancellationToken cancellationToken = default);
-    bool IsModelLoaded { get; }
-}
-
-/// <summary>
 /// ML-based prediction service for PSP routing
 /// </summary>
-public class MLPredictionService : IMLPredictionService
+public class PredictionService : IPredictionService
 {
-    private readonly ILogger<MLPredictionService> _logger;
+    private readonly ILogger<PredictionService> _logger;
     private readonly MLContext _mlContext;
     private readonly string _modelPath;
     private ITransformer? _model;
-    private readonly Dictionary<string, PspSnapshot> _pspMetadata;
 
     public bool IsModelLoaded => _model != null;
 
-    public MLPredictionService(ILogger<MLPredictionService> logger, string modelPath)
+    public PredictionService(ILogger<PredictionService> logger, string modelPath)
     {
         _logger = logger;
         _mlContext = new MLContext(seed: 42);
         _modelPath = modelPath;
-        
-        // Initialize PSP metadata (in production, this would come from a service/database)
-        _pspMetadata = new Dictionary<string, PspSnapshot>();
     }
 
     /// <summary>
