@@ -7,10 +7,12 @@ public class TrainingDataProvider : ITrainingDataProvider
 {
     private readonly ILogger<TrainingDataProvider> _logger;
     private readonly string _connectionString;
+    private readonly TrainerSettings _settings;
 
-    public TrainingDataProvider(ILogger<TrainingDataProvider> logger)
+    public TrainingDataProvider(ILogger<TrainingDataProvider> logger, TrainerSettings settings)
     {
         _logger = logger;
+        _settings = settings;
 
         // Get .env file variables
         var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION") ?? throw new InvalidOperationException("PSPROUTER_DB_CONNECTION environment variable is required");
@@ -46,8 +48,8 @@ public class TrainingDataProvider : ITrainingDataProvider
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync(cancellationToken);
             
-            // Query to fetch 50K diverse transaction data with excellent distribution
-            // This ensures good representation across PSPs, countries, and payment methods
+            // Query to fetch diverse transaction data with configurable date window, per-segment cap,
+            // and success/failure balance (two-stage union with caps)
             var query = @"
                 WITH RankedTransactions AS (
                     SELECT 
@@ -69,28 +71,40 @@ public class TrainingDataProvider : ITrainingDataProvider
                         pt.DateCreated,
                         pt.DateStatusLastUpdated,
                         pt.PspReference,
-                        -- Create diversity score for sampling
+                        CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END AS IsSuccess,
                         ROW_NUMBER() OVER (
                             PARTITION BY 
                                 pt.PaymentGatewayId, 
                                 pt.CountryId, 
                                 pt.PaymentMethodId,
-                                CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 'Success' ELSE 'Failure' END
+                                CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END
                             ORDER BY pt.DateCreated DESC
                         ) as DiversityRank
                     FROM PaymentTransactions pt
-                    WHERE pt.DateCreated >= DATEADD(MONTH, -6, GETDATE())  -- Last 6 months
+                    WHERE pt.DateCreated >= DATEADD(MONTH, -@Months, GETDATE())
                         AND pt.PaymentGatewayId IS NOT NULL
-                        AND pt.PaymentTransactionStatusId IN (5, 7, 9, 11, 15, 17, 22)  -- Include both success and failure
-                        AND pt.CountryId IS NOT NULL  -- Ensure we have country data
-                        AND pt.PaymentMethodId IS NOT NULL  -- Ensure we have payment method data
+                        AND pt.PaymentTransactionStatusId IN (5, 7, 9, 11, 15, 17, 22)
+                        AND pt.CountryId IS NOT NULL
+                        AND pt.PaymentMethodId IS NOT NULL
                 ),
                 DiverseSample AS (
                     SELECT *
                     FROM RankedTransactions
-                    WHERE DiversityRank <= 50  -- Take up to 50 records per PSP/Country/Method/Status combination
+                    WHERE DiversityRank <= @MaxPerSegment
+                ),
+                SuccessSample AS (
+                    SELECT TOP (@TopSuccess) *
+                    FROM DiverseSample
+                    WHERE IsSuccess = 1
+                    ORDER BY NEWID()
+                ),
+                FailureSample AS (
+                    SELECT TOP (@TopFailure) *
+                    FROM DiverseSample
+                    WHERE IsSuccess = 0
+                    ORDER BY NEWID()
                 )
-                SELECT TOP 50000
+                SELECT 
                     PaymentTransactionId,
                     OrderId,
                     Amount,
@@ -109,10 +123,19 @@ public class TrainingDataProvider : ITrainingDataProvider
                     DateCreated,
                     DateStatusLastUpdated,
                     PspReference
-                FROM DiverseSample
-                ORDER BY NEWID()  -- Randomize the final selection";
+                FROM (
+                    SELECT * FROM SuccessSample
+                    UNION ALL
+                    SELECT * FROM FailureSample
+                ) s";
             
             using var command = new SqlCommand(query, connection);
+            var topSuccess = (int)Math.Round(_settings.TargetSampleSize * _settings.TargetSuccessRatio);
+            var topFailure = Math.Max(0, _settings.TargetSampleSize - topSuccess);
+            command.Parameters.AddWithValue("@Months", _settings.DateWindowMonths);
+            command.Parameters.AddWithValue("@MaxPerSegment", _settings.MaxPerSegment);
+            command.Parameters.AddWithValue("@TopSuccess", topSuccess);
+            command.Parameters.AddWithValue("@TopFailure", topFailure);
             using var reader = await command.ExecuteReaderAsync(cancellationToken);
             
             while (await reader.ReadAsync(cancellationToken))

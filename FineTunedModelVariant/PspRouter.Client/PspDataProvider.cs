@@ -171,6 +171,36 @@ public class PspDataProvider : IPspDataProvider
         }
     }
 
+    /// <summary>
+    /// Builds the SQL used to fetch PSP candidates.
+    ///
+    /// Business meaning of precedences:
+    /// 1) Performance window and filters (PspPerformance CTE)
+    ///    - We first compute recent performance (last 30 days) per PSP. Any
+    ///      currency/payment-method filters applied here restrict which
+    ///      transactions are considered in performance metrics. This ensures the
+    ///      auth-rate and fee aggregates reflect the same segment as the request.
+    ///
+    /// 2) Capability filters (PspCapabilities CTE)
+    ///    - Next we compute capabilities over the same filtered slice. Applying
+    ///      currency/payment-method filters here ensures capability presence is
+    ///      evaluated within the same segment (e.g., card-only, specific currency).
+    ///
+    /// 3) Final gates on the joined result (final WHERE)
+    ///    - After joining performance with capabilities, we apply gates that
+    ///      depend on both (e.g., Supports3DS when SCARequired). These are
+    ///      eligibility constraints, not performance derivations.
+    ///
+    /// 4) Minimum volume and ordering (reliability first)
+    ///    - We exclude PSPs with too few transactions in the period to avoid
+    ///      unstable metrics (pp.TotalTransactions30d >= 10), then order by
+    ///      auth rate to favor historically successful PSPs for the given slice.
+    ///
+    /// In short: segment the data first (performance → capabilities), then apply
+    /// eligibility gates, then reliability/ordering. This sequence avoids leaking
+    /// unrelated traffic into metrics and ensures only capable, reliable PSPs are
+    /// returned in priority order.
+    /// </summary>
     private string BuildPspQuery(long? currencyId, long? paymentMethodId, bool? supports3DS)
     {
         var baseQuery = """
@@ -220,9 +250,10 @@ public class PspDataProvider : IPspDataProvider
             ORDER BY pp.AuthRate30d DESC
             """;
 
-        var performanceWhere = new List<string>();
-        var capabilitiesWhere = new List<string>();
-        var finalWhere = new List<string>();
+        // Precedence: segment performance first, then capabilities, then final gates
+        var performanceWhere = new List<string>();   // affects aggregates (auth rate, fees)
+        var capabilitiesWhere = new List<string>();  // affects capability projection (3DS/tokenization)
+        var finalWhere = new List<string>();         // eligibility gates on the joined output
 
         // Add filters for performance query
         if (currencyId.HasValue)

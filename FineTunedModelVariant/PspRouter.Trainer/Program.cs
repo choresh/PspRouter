@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using DotNetEnv;
+using Microsoft.Extensions.Configuration;
 
 namespace PspRouter.Trainer;
 
@@ -66,16 +67,19 @@ public class Program
                     Console.WriteLine($"❌ Error loading .env file: {ex.Message}");
                 }
                 
-                /*
                 config.SetBasePath(Directory.GetCurrentDirectory())
                       .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                       .AddJsonFile($"appsettings.{context.HostingEnvironment.EnvironmentName}.json", optional: true)
                       .AddEnvironmentVariables()
                       .AddCommandLine(args);
-                */
             })
             .ConfigureServices((context, services) =>
             {       
+                // Bind trainer settings from configuration (optional)
+                var trainerSettings = new TrainerSettings();
+                context.Configuration.GetSection("Trainer:Sampling").Bind(trainerSettings);
+                services.AddSingleton(trainerSettings);
+                
                 // Register training services
                 services.AddSingleton<ITrainingService, TrainingService>();
                 services.AddSingleton<ITrainingDataProvider, TrainingDataProvider>();

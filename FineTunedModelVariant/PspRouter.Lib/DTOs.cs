@@ -43,6 +43,21 @@ public record RouteDecision(
     IReadOnlyList<string> Features_Used
 );
 
+public sealed class RoutingSettings
+{
+    public ScoringWeights Weights { get; init; } = new();
+    public string[] AllowedHealthStatuses { get; init; } = new[] { "green", "yellow" };
+
+    public static RoutingSettings Default => new();
+}
+
+public sealed class ScoringWeights
+{
+    public double AuthWeight { get; init; } = 1.0;
+    public double FeeBpsWeight { get; init; } = 1.0;
+    public double FixedFeeWeight { get; init; } = 1.0;
+}
+
 public record TransactionOutcome(
     string DecisionId,
     string PspName,

@@ -93,8 +93,11 @@ builder.Services.AddScoped(provider =>
 {
     var chat = provider.GetRequiredService<IChatClient>();
     var logger = provider.GetRequiredService<ILogger<PspRouter.Lib.PspRouter>>();
+
+    var routingSettings = new RoutingSettings();
+    builder.Configuration.GetSection("PspRouter:Routing").Bind(routingSettings);
     
-    return new PspRouter.Lib.PspRouter(chat, logger);
+    return new PspRouter.Lib.PspRouter(chat, logger, routingSettings);
 });
 
 var app = builder.Build();

@@ -7,11 +7,13 @@ public sealed class PspRouter
 {
     private readonly IChatClient _chat;
     private readonly ILogger<PspRouter>? _logger;
+    private readonly RoutingSettings _settings;
 
-    public PspRouter(IChatClient chat, ILogger<PspRouter>? logger = null)
+    public PspRouter(IChatClient chat, ILogger<PspRouter>? logger = null, RoutingSettings? settings = null)
     {
         _chat = chat; 
         _logger = logger;
+        _settings = settings ?? RoutingSettings.Default;
     }
 
     public async Task<RouteDecision> Decide(RouteContext ctx, CancellationToken ct)
@@ -19,9 +21,10 @@ public sealed class PspRouter
         _logger?.LogInformation("Starting PSP routing decision for merchant {MerchantId}, amount {Amount} CurrencyId {CurrencyId}", 
             ctx.Tx.MerchantId, ctx.Tx.Amount, ctx.Tx.CurrencyId);
 
+        var allowedHealth = _settings.AllowedHealthStatuses;
         var valid = ctx.Candidates
             .Where(c => c.Supports)
-            .Where(c => c.Health is "green" or "yellow")
+            .Where(c => allowedHealth.Contains(c.Health, StringComparer.OrdinalIgnoreCase))
             .Where(c => !(ctx.Tx.SCARequired && ctx.Tx.PaymentMethodId == 1 && !c.Supports3DS)) // PaymentMethodId 1 = Card
             .ToList();
 
@@ -124,9 +127,12 @@ public sealed class PspRouter
 
     private RouteDecision ScoreDeterministically(RouteInput tx, List<PspSnapshot> candidates)
     {
-        // Fallback to deterministic scoring
+        // Fallback to deterministic scoring with configurable weights
+        var w = _settings.Weights;
         var best = candidates.OrderByDescending(c =>
-            c.AuthRate30d - (c.FeeBps/10000.0) - (double)(c.FixedFee/Math.Max(tx.Amount,1m))
+            w.AuthWeight * c.AuthRate30d
+            - w.FeeBpsWeight * (c.FeeBps / 10000.0)
+            - w.FixedFeeWeight * (double)(c.FixedFee / Math.Max(tx.Amount, 1m))
         ).First();
 
         return CreateDecision(best, candidates, tx, "Deterministic scoring", "deterministic");

@@ -43,20 +43,18 @@ This document outlines all the components that need to be implemented to complet
 - [ ] Set database connection string `PSPROUTER_DB_CONNECTION` in `.env`
 
 #### Fine-Tuned Model Setup
-- [ ] Set fine-tuned model ID via `OPENAI_FT_MODEL` or `PspRouter:OpenAI:FineTunedModel`
-- [ ] Confirm strict `RouteDecision` JSON schema in `BuildSystemPrompt()`
-- [ ] Configure timeout/fallback (e.g., 800–1200 ms) and strict JSON validation
-- [ ] Observability: latency, tokens, fallback rate, schema errors
-- [ ] Tests: unit (schema/fallback), integration (end-to-end), performance (P95)
-- [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
+   - [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
+   - Optional: adjust sampling via `Trainer:Sampling` in `PspRouter.Trainer/appsettings.json` (e.g., TargetSampleSize, DateWindowMonths, MaxPerSegment)
    - Run `dotnet run --project PspRouter.Trainer` to execute the workflow
-   - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.Trainer\.env`)
+   - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.API\.env`)
 
 #### Fine-tuning workflow (REQUIRED for production)
 - [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
-   - Change the SQL query (within `GetTrainingDataAsync`): use a much larger, diverse sample for training (thousands to hundreds of thousands of rows) covering successes and failures, multiple currencies, payment methods, regions, 3DS vs non-3DS, tokenized vs non-tokenized, and a wide risk-score distribution.
+   - Adjust sampling via `Trainer:Sampling` in `PspRouter.Trainer/appsettings.json` (e.g., TargetSampleSize, DateWindowMonths, MaxPerSegment)
+   - `Trainer:Sampling:TargetSampleSize` should be thousands to hundreds of thousands of rows
+   - Optional: change the SQL query (within `GetTrainingDataAsync`), to achive better diverse sample for training, covering successes and failures, multiple currencies, payment methods, regions, 3DS vs non-3DS, tokenized vs non-tokenized, and a wide risk-score distribution.
    - Run `dotnet run --project PspRouter.Trainer` to execute the workflow
-  - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.Trainer\.env`)
+   - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.API\.env`)
 
 ---
 
