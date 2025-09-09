@@ -177,9 +177,12 @@ public class PspRouterClient
     }
 
     /// <summary>
-    /// Makes a simple deterministic routing decision based on auth rates and fees
+    /// Prepares candidates and calls the PspRouter.API for routing decision
     /// </summary>
-    public async Task<RouteDecision> MakeDeterministicDecisionAsync(RouteInput transaction, CancellationToken ct = default)
+    public async Task<RouteDecision> MakeDeterministicDecisionAsync(
+        RouteInput transaction, 
+        string apiBaseUrl, 
+        CancellationToken ct = default)
     {
         try
         {
@@ -191,47 +194,49 @@ public class PspRouterClient
                 return CreateFailureDecision("No valid PSPs available");
             }
 
-            // Apply guardrails
-            var validCandidates = context.Candidates
-                .Where(c => c.Supports)
-                .Where(c => c.Health is "green" or "yellow")
-                .Where(c => !(transaction.SCARequired && transaction.PaymentMethodId == 1 && !c.Supports3DS))
-                .ToList();
+            // Call the PspRouter.API
+            var decision = await CallPspRouterApiAsync(context, apiBaseUrl, ct);
 
-            if (validCandidates.Count == 0)
-            {
-                return CreateFailureDecision("No valid PSPs after guardrails");
-            }
-
-            // Deterministic scoring: auth rate - fees
-            var best = validCandidates.OrderByDescending(c =>
-                c.AuthRate30d - (c.FeeBps / 10000.0) - (double)(c.FixedFee / Math.Max(transaction.Amount, 1m))
-            ).First();
-
-            var decision = new RouteDecision(
-                Schema_Version: "1.0",
-                Decision_Id: Guid.NewGuid().ToString(),
-                Candidate: best.Name,
-                Alternates: validCandidates.Where(c => c.Name != best.Name).Select(c => c.Name).ToList(),
-                Reasoning: $"Deterministic scoring - Auth: {best.AuthRate30d:P2}, Fee: {best.FeeBps}bps + {best.FixedFee:C}",
-                Guardrail: "none",
-                Constraints: new RouteConstraints(
-                    Must_Use_3ds: transaction.SCARequired,
-                    Retry_Window_Ms: 8000,
-                    Max_Retries: 1
-                ),
-                Features_Used: new[] { $"auth={best.AuthRate30d:F2}", $"fee_bps={best.FeeBps}", "deterministic" }
-            );
-
-            _logger?.LogInformation("Deterministic routing decision: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
+            _logger?.LogInformation("API routing decision: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
             
             return decision;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to make deterministic decision for transaction {MerchantId}", transaction.MerchantId);
+            _logger?.LogError(ex, "Failed to make routing decision via API for transaction {MerchantId}", transaction.MerchantId);
             throw;
         }
+    }
+
+    private async Task<RouteDecision> CallPspRouterApiAsync(
+        RouteContext context, 
+        string apiBaseUrl, 
+        CancellationToken ct)
+    {
+        using var httpClient = new HttpClient();
+        
+        var requestBody = new
+        {
+            Transaction = context.Transaction,
+            Candidates = context.Candidates
+        };
+
+        var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions { WriteIndented = true });
+        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+        var apiUrl = $"{apiBaseUrl.TrimEnd('/')}/api/routing/route";
+        var response = await httpClient.PostAsync(apiUrl, content, ct);
+        response.EnsureSuccessStatusCode();
+
+        var responseJson = await response.Content.ReadAsStringAsync(ct);
+        var decision = JsonSerializer.Deserialize<RouteDecision>(responseJson);
+
+        if (decision == null)
+        {
+            throw new InvalidOperationException("Failed to deserialize routing decision from API");
+        }
+
+        return decision;
     }
 
     private async Task<RouteDecision> CallFineTunedModelAsync(
@@ -291,7 +296,7 @@ public static class PspRouterClientFactory
     /// </summary>
     public static PspRouterClient Create(string connectionString, ILogger<PspRouterClient>? logger = null)
     {
-        var pspProvider = new PspDataProvider(connectionString, logger);
+        var pspProvider = new PspDataProvider(connectionString, null);
         return new PspRouterClient(pspProvider, logger);
     }
 

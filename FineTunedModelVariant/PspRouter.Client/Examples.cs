@@ -49,9 +49,9 @@ public static class PspRouterClientExamples
     }
 
     /// <summary>
-    /// Example: Make deterministic routing decision
+    /// Example: Make routing decision via PspRouter.API
     /// </summary>
-    public static async Task<RouteDecision> MakeDeterministicDecisionExample(string connectionString)
+    public static async Task<RouteDecision> MakeApiDecisionExample(string connectionString, string apiBaseUrl)
     {
         var client = PspRouterClientFactory.Create(connectionString);
         
@@ -68,10 +68,10 @@ public static class PspRouterClientExamples
             RiskScore: 25
         );
         
-        // Make deterministic routing decision
-        var decision = await client.MakeDeterministicDecisionAsync(transaction);
+        // Make routing decision via API
+        var decision = await client.MakeDeterministicDecisionAsync(transaction, apiBaseUrl);
         
-        Console.WriteLine($"Routing decision: {decision.Candidate}");
+        Console.WriteLine($"API routing decision: {decision.Candidate}");
         Console.WriteLine($"Reasoning: {decision.Reasoning}");
         Console.WriteLine($"Alternates: {string.Join(", ", decision.Alternates)}");
         
@@ -148,6 +148,7 @@ public static class PspRouterClientExamples
     /// </summary>
     public static async Task<RouteDecision> CompleteRoutingWorkflowExample(
         string connectionString,
+        string? apiBaseUrl = null,
         string? modelApiUrl = null,
         string? apiKey = null)
     {
@@ -184,10 +185,14 @@ public static class PspRouterClientExamples
             Console.WriteLine("Using fine-tuned model for routing decision...");
             decision = await client.MakeRoutingDecisionAsync(transaction, modelApiUrl, apiKey);
         }
+        else if (!string.IsNullOrEmpty(apiBaseUrl))
+        {
+            Console.WriteLine("Using PspRouter.API for routing decision...");
+            decision = await client.MakeDeterministicDecisionAsync(transaction, apiBaseUrl);
+        }
         else
         {
-            Console.WriteLine("Using deterministic scoring for routing decision...");
-            decision = await client.MakeDeterministicDecisionAsync(transaction);
+            throw new ArgumentException("Either apiBaseUrl or modelApiUrl+apiKey must be provided");
         }
         
         Console.WriteLine($"\n=== ROUTING DECISION ===");
@@ -204,9 +209,9 @@ public static class PspRouterClientExamples
     }
 
     /// <summary>
-    /// Example: Batch processing multiple transactions
+    /// Example: Batch processing multiple transactions via API
     /// </summary>
-    public static async Task<List<RouteDecision>> BatchProcessingExample(string connectionString)
+    public static async Task<List<RouteDecision>> BatchProcessingExample(string connectionString, string apiBaseUrl)
     {
         var client = PspRouterClientFactory.Create(connectionString);
         
@@ -220,13 +225,13 @@ public static class PspRouterClientExamples
         
         var decisions = new List<RouteDecision>();
         
-        Console.WriteLine("Processing batch of transactions...");
+        Console.WriteLine("Processing batch of transactions via API...");
         
         foreach (var transaction in transactions)
         {
             try
             {
-                var decision = await client.MakeDeterministicDecisionAsync(transaction);
+                var decision = await client.MakeDeterministicDecisionAsync(transaction, apiBaseUrl);
                 decisions.Add(decision);
                 
                 Console.WriteLine($"Transaction {transaction.MerchantId}: {decision.Candidate} - {decision.Reasoning}");

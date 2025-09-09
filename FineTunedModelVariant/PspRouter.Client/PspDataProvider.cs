@@ -272,14 +272,14 @@ public class PspDataProvider : IPspDataProvider
     private PspSnapshot MapToPspSnapshot(IDataReader reader)
     {
         return new PspSnapshot(
-            Name: reader.GetString("Name"),
-            Supports: reader.GetBoolean("Supports"),
-            Health: reader.GetString("Health"),
-            AuthRate30d: reader.GetDouble("AuthRate30d"),
-            FeeBps: reader.GetInt32("FeeBps"),
-            FixedFee: reader.GetDecimal("FixedFee"),
-            Supports3DS: reader.GetBoolean("Supports3DS"),
-            Tokenization: reader.GetBoolean("Tokenization")
+            Name: reader.GetString(0),
+            Supports: reader.GetBoolean(1),
+            Health: reader.GetString(2),
+            AuthRate30d: reader.GetDouble(3),
+            FeeBps: reader.GetInt32(4),
+            FixedFee: reader.GetDecimal(5),
+            Supports3DS: reader.GetBoolean(6),
+            Tokenization: reader.GetBoolean(7)
         );
     }
 }
