@@ -103,7 +103,7 @@ builder.Services.AddScoped(provider =>
     var tools = new List<IAgentTool>
     {
         new GetHealthTool(health),
-        new GetFeeQuoteTool(fees, () => new RouteInput("", "", "", "", 0, PaymentMethod.Card))
+        new GetFeeQuoteTool(fees, () => new RouteInput("", "", "", 0, 0, 0))
     };
 
     return new PspRouter.Lib.PspRouter(chat, health, fees, tools, logger);

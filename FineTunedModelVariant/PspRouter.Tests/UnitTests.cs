@@ -10,7 +10,7 @@ public class UnitTests
     public void TestCapabilityProvider()
     {
         // Arrange
-        var tx = new RouteInput("M001", "US", "IL", "USD", 100.00m, PaymentMethod.Card, CardScheme.Visa, false, 10, "411111");
+        var tx = new RouteInput("M001", "US", "IL", 1, 100.00m, 1, "411111", null, false, false, 10);
         
         // Act
         var supportsAdyen = capability.Supports("Adyen", tx);

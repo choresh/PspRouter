@@ -28,8 +28,8 @@ public class RoutingController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Processing routing request for merchant {MerchantId}, amount {Amount} {Currency}", 
-                request.Transaction.MerchantId, request.Transaction.Amount, request.Transaction.Currency);
+            _logger.LogInformation("Processing routing request for merchant {MerchantId}, amount {Amount} {CurrencyId}", 
+                request.Transaction.MerchantId, request.Transaction.Amount, request.Transaction.CurrencyId);
 
             var context = new Lib.RouteContext(
                 request.Transaction,
@@ -38,7 +38,7 @@ public class RoutingController : ControllerBase
                 request.Statistics ?? new Dictionary<string, double>()
             );
 
-            var decision = await _router.DecideAsync(context, CancellationToken.None);
+            var decision = await _router.Decide(context, CancellationToken.None);
 
             _logger.LogInformation("Routing decision made: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
 

@@ -18,7 +18,7 @@ public sealed class OpenAIChatClient : IChatClient
         _model = model;
     }
 
-    public async Task<string> CompleteJsonAsync(string systemPrompt, string userInstruction, string contextJson,
+    public async Task<string> CompleteJson(string systemPrompt, string userInstruction, string contextJson,
         IEnumerable<IAgentTool> tools, double temperature, CancellationToken ct)
     {
         var messages = new List<object> {
@@ -41,8 +41,8 @@ public sealed class OpenAIChatClient : IChatClient
             var payload = new
             {
                 model = _model,
-                temperature = temperature,
-                messages = messages,
+                temperature,
+                messages,
                 response_format = new { type = "json_object" },
                 tools = toolDefs.Count == 0 ? null : toolDefs,
                 tool_choice = toolDefs.Count == 0 ? null : "auto"
@@ -75,7 +75,7 @@ public sealed class OpenAIChatClient : IChatClient
                     string toolResult = "{\"ok\":false,\"error\":\"unknown tool\"}";
                     if (tool is not null)
                     {
-                        toolResult = await tool.InvokeAsync(argsJson, ct);
+                        toolResult = await tool.Invoke(argsJson, ct);
                     }
 
                     messages.Add(new { role = "tool", content = toolResult, tool_call_id = id });

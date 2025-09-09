@@ -21,7 +21,7 @@ public class IntegrationTests
         var tools = new List<IAgentTool>
         {
             new GetHealthTool(healthProvider),
-            new GetFeeQuoteTool(feeProvider, () => new RouteInput("", "", "", "", 0, PaymentMethod.Card))
+            new GetFeeQuoteTool(feeProvider, () => new RouteInput("", "", "", 1, 0, 1))
         };
 
         var router = new Lib.PspRouter(chatClient, healthProvider, feeProvider, tools, logger);
@@ -29,11 +29,11 @@ public class IntegrationTests
         // Test multiple transactions to demonstrate learning
         var testTransactions = new[]
         {
-            new RouteInput("M001", "US", "IL", "USD", 150.00m, PaymentMethod.Card, CardScheme.Visa, false, 15, "411111"),
-            new RouteInput("M002", "GB", "IL", "GBP", 75.50m, PaymentMethod.Card, CardScheme.Mastercard, true, 25, "555555"),
-            new RouteInput("M003", "DE", "IL", "EUR", 200.00m, PaymentMethod.PayPal, CardScheme.Unknown, false, 10),
-            new RouteInput("M001", "US", "IL", "USD", 300.00m, PaymentMethod.Card, CardScheme.Visa, false, 20, "411111"),
-            new RouteInput("M002", "GB", "IL", "GBP", 50.00m, PaymentMethod.Card, CardScheme.Mastercard, false, 5, "555555")
+            new RouteInput("M001", "US", "IL", 1, 150.00m, 1, "411111", null, false, false, 15),
+            new RouteInput("M002", "GB", "IL", 2, 75.50m, 1, "555555", null, true, false, 25),
+            new RouteInput("M003", "DE", "IL", 3, 200.00m, 2, null, null, false, false, 10),
+            new RouteInput("M001", "US", "IL", 1, 300.00m, 1, "411111", null, false, false, 20),
+            new RouteInput("M002", "GB", "IL", 2, 50.00m, 1, "555555", null, false, false, 5)
         };
 
         // Act & Assert - Process each transaction
@@ -42,7 +42,7 @@ public class IntegrationTests
             var tx = testTransactions[i];
             
             // Build context
-            var candidates = await BuildCandidatesAsync(tx, healthProvider);
+            var candidates = await BuildCandidates(tx, healthProvider);
             var prefs = new Dictionary<string, string> { ["prefer_low_fees"] = "true" };
             var stats = new Dictionary<string, double>
             {
@@ -55,7 +55,7 @@ public class IntegrationTests
             var ctx = new RouteContext(tx, candidates, prefs, stats);
 
             // Make routing decision
-            var decision = await router.DecideAsync(ctx, CancellationToken.None);
+            var decision = await router.Decide(ctx, CancellationToken.None);
             
             // Verify decision was made
             Assert.NotNull(decision);
@@ -70,26 +70,26 @@ public class IntegrationTests
         }
     }
 
-    private async Task<List<PspSnapshot>> BuildCandidatesAsync(RouteInput tx, IHealthProvider health)
+    private async Task<List<PspSnapshot>> BuildCandidates(RouteInput tx, IHealthProvider health)
     {
         var candidates = new List<PspSnapshot>();
         
         // Add supported PSPs based on capability matrix
         if (this.capability.Supports("Adyen", tx))
         {
-            var (healthStatus, latency) = await health.GetAsync("Adyen", CancellationToken.None);
+            var (healthStatus, latency) = await health.Get("Adyen", CancellationToken.None);
             candidates.Add(new("Adyen", true, healthStatus, GetRealisticAuthRate(tx, "Adyen"), latency, GetRealisticFeeBps(tx, "Adyen"), true, true));
         }
         
         if (capability.Supports("Stripe", tx))
         {
-            var (healthStatus, latency) = await health.GetAsync("Stripe", CancellationToken.None);
+            var (healthStatus, latency) = await health.Get("Stripe", CancellationToken.None);
             candidates.Add(new("Stripe", true, healthStatus, GetRealisticAuthRate(tx, "Stripe"), latency, GetRealisticFeeBps(tx, "Stripe"), true, true));
         }
         
         if (capability.Supports("Klarna", tx))
         {
-            var (healthStatus, latency) = await health.GetAsync("Klarna", CancellationToken.None);
+            var (healthStatus, latency) = await health.Get("Klarna", CancellationToken.None);
             candidates.Add(new("Klarna", true, healthStatus, GetRealisticAuthRate(tx, "Klarna"), latency, GetRealisticFeeBps(tx, "Klarna"), true, true));
         }
         
@@ -101,9 +101,9 @@ public class IntegrationTests
         // Simulate realistic fee structures
         return psp switch
         {
-            "Adyen" => tx.Method == PaymentMethod.Card ? 200 : 300,
-            "Stripe" => tx.Method == PaymentMethod.Card ? 180 : 250,
-            "Klarna" => tx.Method == PaymentMethod.KlarnaPayLater ? 400 : 350,
+            "Adyen" => tx.PaymentMethodId == 1 ? 200 : 300,        // PaymentMethodId 1 = Card
+            "Stripe" => tx.PaymentMethodId == 1 ? 180 : 250,       // PaymentMethodId 1 = Card
+            "Klarna" => tx.PaymentMethodId == 3 ? 400 : 350,       // PaymentMethodId 3 = KlarnaPayLater
             _ => 250
         };
     }

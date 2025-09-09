@@ -11,11 +11,11 @@ public sealed class GetHealthTool : IAgentTool
 
     public string JsonSchema => @"{""type"":""object"",""properties"":{""psp"":{""type"":""string""}},""required"":[""psp""]}";
 
-    public async Task<string> InvokeAsync(string jsonArgs, CancellationToken ct)
+    public async Task<string> Invoke(string jsonArgs, CancellationToken ct)
     {
         using var doc = JsonDocument.Parse(jsonArgs);
         var psp = doc.RootElement.GetProperty("psp").GetString() ?? "";
-        var (h, lat) = await _health.GetAsync(psp, ct);
+        var (h, lat) = await _health.Get(psp, ct);
         var payload = new { psp = psp, health = h, latency_ms = lat };
         return JsonSerializer.Serialize(payload);
     }
@@ -34,11 +34,11 @@ public sealed class GetFeeQuoteTool : IAgentTool
 
     public string JsonSchema => @"{""type"":""object"",""properties"":{""psp"":{""type"":""string""}},""required"":[""psp""]}";
 
-    public async Task<string> InvokeAsync(string jsonArgs, CancellationToken ct)
+    public async Task<string> Invoke(string jsonArgs, CancellationToken ct)
     {
         using var doc = JsonDocument.Parse(jsonArgs);
         var psp = doc.RootElement.GetProperty("psp").GetString() ?? "";
-        var (bps, fixedFee) = await _fees.GetAsync(psp, _txAccessor(), ct);
+        var (bps, fixedFee) = await _fees.Get(psp, _txAccessor(), ct);
         var payload = new { psp = psp, fee_bps = bps, fixed_fee = fixedFee };
         return JsonSerializer.Serialize(payload);
     }

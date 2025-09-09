@@ -9,7 +9,6 @@ public sealed class PspRouter
     private readonly IEnumerable<IAgentTool> _tools;
     private readonly IHealthProvider _health;
     private readonly IFeeQuoteProvider _fees;
-    
     private readonly ILogger<PspRouter>? _logger;
 
     public PspRouter(IChatClient chat, IHealthProvider health, IFeeQuoteProvider fees,
@@ -19,15 +18,15 @@ public sealed class PspRouter
         _logger = logger;
     }
 
-    public async Task<RouteDecision> DecideAsync(RouteContext ctx, CancellationToken ct)
+    public async Task<RouteDecision> Decide(RouteContext ctx, CancellationToken ct)
     {
-        _logger?.LogInformation("Starting PSP routing decision for merchant {MerchantId}, amount {Amount} {Currency}", 
-            ctx.Tx.MerchantId, ctx.Tx.Amount, ctx.Tx.Currency);
+        _logger?.LogInformation("Starting PSP routing decision for merchant {MerchantId}, amount {Amount} CurrencyId {CurrencyId}", 
+            ctx.Tx.MerchantId, ctx.Tx.Amount, ctx.Tx.CurrencyId);
 
         var valid = ctx.Candidates
             .Where(c => c.Supports)
             .Where(c => c.Health is "green" or "yellow")
-            .Where(c => !(ctx.Tx.SCARequired && ctx.Tx.Method == PaymentMethod.Card && !c.Supports3DS))
+            .Where(c => !(ctx.Tx.SCARequired && ctx.Tx.PaymentMethodId == 1 && !c.Supports3DS)) // PaymentMethodId 1 = Card
             .ToList();
 
         if (valid.Count == 0)
@@ -39,7 +38,7 @@ public sealed class PspRouter
         // Try LLM-based routing first
         try
         {
-            var llmDecision = await DecideWithLLMAsync(ctx, valid, ct);
+            var llmDecision = await DecideWithLLM(ctx, valid, ct);
             if (llmDecision != null)
             {
                 _logger?.LogInformation("LLM routing successful: {Candidate}", llmDecision.Candidate);
@@ -60,10 +59,10 @@ public sealed class PspRouter
         new("1.0", Guid.NewGuid().ToString(), "NONE", Array.Empty<string>(), why, guardrail,
             new RouteConstraints(false, 0, 0), Array.Empty<string>());
 
-    private async Task<RouteDecision?> DecideWithLLMAsync(RouteContext ctx, List<PspSnapshot> validCandidates, CancellationToken ct)
+    private async Task<RouteDecision?> DecideWithLLM(RouteContext ctx, List<PspSnapshot> validCandidates, CancellationToken ct)
     {
         // Retrieve relevant lessons from memory
-        var relevantLessons = await GetRelevantLessonsAsync(ctx, ct);
+        var relevantLessons = await GetRelevantLessons(ctx, ct);
         
         // Build context for LLM
         var contextJson = JsonSerializer.Serialize(new {
@@ -77,7 +76,7 @@ public sealed class PspRouter
         var systemPrompt = BuildSystemPrompt();
         var userInstruction = $"Route this payment transaction to the optimal PSP. Consider auth rates, fees, compliance requirements, and historical lessons.";
 
-        var response = await _chat.CompleteJsonAsync(systemPrompt, userInstruction, contextJson, _tools, 0.1, ct);
+        var response = await _chat.CompleteJson(systemPrompt, userInstruction, contextJson, _tools, 0.1, ct);
         
         try
         {
@@ -95,12 +94,12 @@ public sealed class PspRouter
         return null;
     }
 
-    private async Task<List<string>> GetRelevantLessonsAsync(RouteContext ctx, CancellationToken ct)
+    private async Task<List<string>> GetRelevantLessons(RouteContext ctx, CancellationToken ct)
     {
         try
         {
             // Create a query based on transaction context
-            var query = $"PSP routing for {ctx.Tx.Currency} {ctx.Tx.Method} {ctx.Tx.Scheme} merchant {ctx.Tx.MerchantCountry}";
+            var query = $"PSP routing for CurrencyId {ctx.Tx.CurrencyId} PaymentMethodId {ctx.Tx.PaymentMethodId} merchant {ctx.Tx.MerchantCountry}";
             
             // Note: In a full implementation, you would:
             // 1. Use OpenAIEmbeddings to embed the query
@@ -179,7 +178,7 @@ public sealed class PspRouter
             Reasoning: $"{method} - Auth: {chosen.AuthRate30d:P2}, Fee: {chosen.FeeBps}bps + {chosen.FixedFee:C}",
             Guardrail: "none",
             Constraints: new RouteConstraints(
-                Must_Use_3ds: tx.SCARequired && tx.Method == PaymentMethod.Card,
+                Must_Use_3ds: tx.SCARequired && tx.PaymentMethodId == 1, // PaymentMethodId 1 = Card
                 Retry_Window_Ms: 8000,
                 Max_Retries: 1),
             Features_Used: new[] { 

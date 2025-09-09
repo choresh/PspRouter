@@ -1,19 +1,17 @@
 namespace PspRouter.Lib;
 
-public enum PaymentMethod { Card, PayPal, KlarnaPayLater }
-public enum CardScheme { Visa, Mastercard, Amex, Unknown }
-
 public record RouteInput(
     string MerchantId,
     string BuyerCountry,
     string MerchantCountry,
-    string Currency,
+    long CurrencyId,
     decimal Amount,
-    PaymentMethod Method,
-    CardScheme Scheme = CardScheme.Unknown,
+    long PaymentMethodId,
+    string? PaymentCardBin = null,
+    long? ThreeDSTypeId = null,
+    bool IsTokenized = false,
     bool SCARequired = false,
-    int RiskScore = 0,
-    string? Bin = null
+    int RiskScore = 0
 );
 
 public record PspSnapshot(
