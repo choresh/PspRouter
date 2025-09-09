@@ -84,11 +84,38 @@ builder.Services.AddSwaggerGen(c =>
 var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is required");
 var ftModel = Environment.GetEnvironmentVariable("OPENAI_FT_MODEL") ?? throw new InvalidOperationException("OPENAI_FT_MODEL environment variable is required");
 
+// Get ML model path from configuration
+var mlModelPath = builder.Configuration["ML:ModelPath"] ?? "models/psp_routing_model.zip";
+
 // === Register Core Services ===
 builder.Services.AddSingleton<IChatClient>(provider => 
     new OpenAIChatClient(apiKey, model: ftModel));
 
-// === Register Router as Scoped (for request-based operations) ===
+// === Register ML Services ===
+builder.Services.AddSingleton<IMLPredictionService>(provider =>
+{
+    var logger = provider.GetRequiredService<ILogger<MLPredictionService>>();
+    var service = new MLPredictionService(logger, mlModelPath);
+    
+    // Load the model asynchronously on startup
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            await service.LoadModelAsync();
+            logger.LogInformation("ML model loaded successfully during startup");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load ML model during startup");
+        }
+    });
+    
+    return service;
+});
+
+// === Register Routers ===
+// Original LLM-based router
 builder.Services.AddScoped(provider =>
 {
     var chat = provider.GetRequiredService<IChatClient>();
@@ -98,6 +125,19 @@ builder.Services.AddScoped(provider =>
     builder.Configuration.GetSection("PspRouter:Routing").Bind(routingSettings);
     
     return new PspRouter.Lib.PspRouter(chat, logger, routingSettings);
+});
+
+// ML-based router with LLM fallback
+builder.Services.AddScoped(provider =>
+{
+    var mlService = provider.GetRequiredService<IMLPredictionService>();
+    var chat = provider.GetRequiredService<IChatClient>();
+    var logger = provider.GetRequiredService<ILogger<MLBasedRouter>>();
+
+    var routingSettings = new RoutingSettings();
+    builder.Configuration.GetSection("PspRouter:Routing").Bind(routingSettings);
+    
+    return new MLBasedRouter(mlService, chat, logger, routingSettings);
 });
 
 var app = builder.Build();

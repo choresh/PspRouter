@@ -10,16 +10,20 @@ namespace PspRouter.API.Controllers;
 public class RoutingController : ControllerBase
 {
     private readonly Lib.PspRouter _router;
+    private readonly MLBasedRouter _mlRouter;
+    private readonly IMLPredictionService _mlPredictionService;
     private readonly ILogger<RoutingController> _logger;
 
-    public RoutingController(Lib.PspRouter router, ILogger<RoutingController> logger)
+    public RoutingController(Lib.PspRouter router, MLBasedRouter mlRouter, IMLPredictionService mlPredictionService, ILogger<RoutingController> logger)
     {
         _router = router;
+        _mlRouter = mlRouter;
+        _mlPredictionService = mlPredictionService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Route a payment transaction to the best PSP
+    /// Route a payment transaction to the best PSP using LLM-based routing
     /// </summary>
     /// <param name="request">Routing request containing transaction details and candidates</param>
     /// <returns>Routing decision with selected PSP and reasoning</returns>
@@ -28,7 +32,7 @@ public class RoutingController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Processing routing request for merchant {MerchantId}, amount {Amount} {CurrencyId}", 
+            _logger.LogInformation("Processing LLM routing request for merchant {MerchantId}, amount {Amount} {CurrencyId}", 
                 request.Transaction.MerchantId, request.Transaction.Amount, request.Transaction.CurrencyId);
 
             var context = new Lib.RouteContext(
@@ -38,13 +42,44 @@ public class RoutingController : ControllerBase
 
             var decision = await _router.Decide(context, CancellationToken.None);
 
-            _logger.LogInformation("Routing decision made: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
+            _logger.LogInformation("LLM routing decision made: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
 
             return Ok(decision);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing routing request");
+            _logger.LogError(ex, "Error processing LLM routing request");
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Route a payment transaction to the best PSP using ML-based routing with LLM fallback
+    /// </summary>
+    /// <param name="request">Routing request containing transaction details and candidates</param>
+    /// <returns>Routing decision with selected PSP and reasoning</returns>
+    [HttpPost("route-ml")]
+    public async Task<ActionResult<RouteDecision>> RouteTransactionML([FromBody] RouteRequest request)
+    {
+        try
+        {
+            _logger.LogInformation("Processing ML routing request for merchant {MerchantId}, amount {Amount} {CurrencyId}", 
+                request.Transaction.MerchantId, request.Transaction.Amount, request.Transaction.CurrencyId);
+
+            var context = new Lib.RouteContext(
+                request.Transaction,
+                request.Candidates
+            );
+
+            var decision = await _mlRouter.Decide(context, CancellationToken.None);
+
+            _logger.LogInformation("ML routing decision made: {PSP} - {Reasoning}", decision.Candidate, decision.Reasoning);
+
+            return Ok(decision);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing ML routing request");
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
@@ -69,6 +104,34 @@ public class RoutingController : ControllerBase
             service = "PspRouter.API",
             version = informationalVersion,
             assemblyVersion = version,
+            apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0"
+        });
+    }
+
+    /// <summary>
+    /// Get ML model status and information
+    /// </summary>
+    /// <returns>ML model status information</returns>
+    [HttpGet("ml-status")]
+    public ActionResult<object> GetMLStatus()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+        var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? version;
+        
+        return Ok(new
+        {
+            status = "healthy",
+            timestamp = DateTime.UtcNow,
+            mlModel = new
+            {
+                loaded = _mlPredictionService.IsModelLoaded,
+                version = "1.0",
+                type = "LightGBM",
+                description = "PSP routing success prediction model"
+            },
+            service = "PspRouter.API",
+            version = informationalVersion,
             apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0"
         });
     }

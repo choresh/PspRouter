@@ -1,0 +1,117 @@
+### Test ML Model Status
+GET http://localhost:5174/api/v1/routing/ml-status
+Content-Type: application/json
+
+###
+
+### Test Health Endpoint
+GET http://localhost:5174/api/v1/routing/health
+Content-Type: application/json
+
+###
+
+### Test ML-based Routing
+POST http://localhost:5174/api/v1/routing/route-ml
+Content-Type: application/json
+
+{
+  "transaction": {
+    "merchantId": "TEST_MERCHANT_001",
+    "buyerCountry": "US",
+    "merchantCountry": "US",
+    "currencyId": 1,
+    "amount": 100.50,
+    "paymentMethodId": 1,
+    "paymentCardBin": "411111",
+    "threeDSTypeId": 1,
+    "isTokenized": false,
+    "scaRequired": true,
+    "riskScore": 25
+  },
+  "candidates": [
+    {
+      "name": "PSP_A",
+      "supports": true,
+      "health": "green",
+      "authRate30d": 0.92,
+      "feeBps": 100,
+      "fixedFee": 0.10,
+      "supports3DS": true,
+      "tokenization": true
+    },
+    {
+      "name": "PSP_B",
+      "supports": true,
+      "health": "yellow",
+      "authRate30d": 0.88,
+      "feeBps": 120,
+      "fixedFee": 0.15,
+      "supports3DS": false,
+      "tokenization": true
+    },
+    {
+      "name": "PSP_C",
+      "supports": true,
+      "health": "green",
+      "authRate30d": 0.95,
+      "feeBps": 80,
+      "fixedFee": 0.05,
+      "supports3DS": true,
+      "tokenization": false
+    }
+  ]
+}
+
+###
+
+### Test LLM-based Routing (for comparison)
+POST http://localhost:5174/api/v1/routing/route
+Content-Type: application/json
+
+{
+  "transaction": {
+    "merchantId": "TEST_MERCHANT_001",
+    "buyerCountry": "US",
+    "merchantCountry": "US",
+    "currencyId": 1,
+    "amount": 100.50,
+    "paymentMethodId": 1,
+    "paymentCardBin": "411111",
+    "threeDSTypeId": 1,
+    "isTokenized": false,
+    "scaRequired": true,
+    "riskScore": 25
+  },
+  "candidates": [
+    {
+      "name": "PSP_A",
+      "supports": true,
+      "health": "green",
+      "authRate30d": 0.92,
+      "feeBps": 100,
+      "fixedFee": 0.10,
+      "supports3DS": true,
+      "tokenization": true
+    },
+    {
+      "name": "PSP_B",
+      "supports": true,
+      "health": "yellow",
+      "authRate30d": 0.88,
+      "feeBps": 120,
+      "fixedFee": 0.15,
+      "supports3DS": false,
+      "tokenization": true
+    },
+    {
+      "name": "PSP_C",
+      "supports": true,
+      "health": "green",
+      "authRate30d": 0.95,
+      "feeBps": 80,
+      "fixedFee": 0.05,
+      "supports3DS": true,
+      "tokenization": false
+    }
+  ]
+}
