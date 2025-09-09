@@ -2,12 +2,11 @@
 
 ## 🎯 Purpose
 
- MakeDeterministicDecisionADecide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using a **fine-tuned LLM-based decision engine** that learns everything from historical transaction data.
+Decide the optimal PSP (Adyen / Stripe / Klarna / PayPal) per transaction to maximize auth success, minimize fees, and maintain compliance & reliability using a **fine-tuned LLM-based decision engine** that learns everything from historical transaction data.
 
 ## 🏗 Solution Overview
-- **3-Project Architecture**: Clean separation with Library, Web API, and Tests
+- **5-Project Architecture**: Clean separation with Trainer, Library, Web API, Client SDK and Tests
 - **ASP.NET Core Web API**: RESTful API with Swagger documentation
-- **Configuration Management**: JSON + environment variables with hierarchical config
 - **Fine-Tuned Model**: AI learns PSP patterns, fees, and capabilities from historical data
 - **Simplified Architecture**: No external providers needed - model learns everything
 - **Production Ready**: Structured logging, health checks, and monitoring
@@ -76,12 +75,13 @@
 
 ## 📦 Project Layout
 
-### 🏗️ **3-Project Architecture**
+### 🏗️ **5-Project Architecture**
 
 ```
 PspRouter/
 ├── PspRouter.Lib/           # Core business logic library
 ├── PspRouter.API/           # ASP.NET Core Web API
+├── PspRouter.Client/        # Sender-side client SDK (real-time DB → candidates → call API)
 ├── PspRouter.Tests/         # Unit tests
 ├── PspRouter.Trainer/       # Fine-tuning service
 ├── PspRouter.sln           # Solution file
@@ -103,6 +103,13 @@ PspRouter/
 - `Dummies.cs` – Mock implementations for local testing and development (DummyChatClient only)
 - `appsettings.json` – Configuration file with logging and PSP router settings
 - `PspRouter.API.csproj` – .NET 8 Web API with ASP.NET Core dependencies (`Microsoft.AspNetCore.OpenApi`, `Swashbuckle.AspNetCore`, etc.)
+
+### 💼 **PspRouter.Client** (Sender SDK)
+- `Models.cs` – DTOs for transaction, candidates, decision
+- `PspDataProvider.cs` – Real-time SQL Server queries from `PaymentTransactions` to build candidates
+- `PspRouterClient.cs` – High-level API to build candidates and call the API
+- `Examples.cs` – End-to-end usage samples
+- `README.md` – Client usage guide
 
 ### 🎓 **PspRouter.Trainer** (Fine-Tuning Service)
 - `Program.cs` – Console application for training fine-tuned models
@@ -142,12 +149,26 @@ PspRouter/
 - **CI/CD Ready**: Automated testing in build pipelines
 - **Quality Assurance**: Ensures reliability and correctness
 
+### **💼 PspRouter.Client (Sender SDK)**
+- **Real-Time Candidates**: Builds PSP candidates from `PaymentTransactions` at call time
+- **Easy Integration**: Simple API (`PspRouterClient`) to prepare candidates and call the API
+- **Independent Usage**: Can be used by external systems without hosting our API
+- **Examples & Docs**: Comes with `Examples.cs` and a dedicated README
+
+### **🎓 PspRouter.Trainer (Fine-Tuning Service)**
+- **End-to-End Training**: Uploads JSONL, creates fine-tuning jobs, monitors status
+- **Data-Driven**: Pulls labeled data from `PaymentTransactions`
+- **Operational Workflow**: Designed for periodic retraining and rollout
+- **Production Readiness**: Retrain/evaluate/deploy loop documented in detail
+
 ### **🎯 Development Workflow**
 ```bash
 # 1. Develop core logic in PspRouter.Lib
 # 2. Test with PspRouter.Tests
-# 3. Integrate and demo with PspRouter.API
-# 4. Package library for distribution
+# 3. Build sender integration using PspRouter.Client (real-time candidates → call API)
+# 4. Integrate and demo with PspRouter.API
+# 5. Train/refresh model with PspRouter.Trainer
+# 6. Package libraries for distribution (optional)
 ```
 
 
@@ -457,12 +478,33 @@ Invoke-RestMethod -Uri "https://localhost:7000/api/routing/route" -Method POST -
 Invoke-RestMethod -Uri "https://localhost:7000/api/routing/health" -Method GET
 ```
 
-### 📚 Library Usage
+### 📚 Client Library Usage (sender-side)
 
-#### Basic Routing
+The client library builds candidates from the database in real time and calls the API.
+
 ```csharp
-var router = new PspRouter(chatClient, logger);
-var decision = await router.Decide(context, cancellationToken);
+using PspRouter.Client;
+
+var connectionString = "Server=...;Database=...;User Id=...;Password=...;TrustServerCertificate=true;";
+var apiBaseUrl = "https://localhost:7000";
+
+var client = PspRouterClientFactory.Create(connectionString);
+
+var tx = new RouteInput(
+    MerchantId: "M123",
+    BuyerCountry: "US",
+    MerchantCountry: "US",
+    CurrencyId: 1,
+    Amount: 150.00m,
+    PaymentMethodId: 1,
+    PaymentCardBin: "411111",
+    SCARequired: false,
+    RiskScore: 25
+);
+
+// 1) Build route context (candidates from DB), 2) call API
+var decision = await client.MakeDeterministicDecisionAsync(tx, apiBaseUrl);
+Console.WriteLine($"Selected PSP: {decision.Candidate}");
 ```
 
 ## 🔧 Configuration

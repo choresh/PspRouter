@@ -15,11 +15,13 @@ This document outlines all the components that need to be implemented to complet
 5. Testing: integration and performance (latency + fallback)
 6. Deployment: containerization, CI/CD, config management
 7. Hardening: security, rate limiting, caching
+8. Client SDK: sender-side library to build candidates and call API
 
 ### **⚠️ Critical Dependencies**
 - Environment configuration before training
 - Historical transaction data before fine-tuning
 - Observability before production rollout
+- Database connectivity for Client SDK
 
 ### **🔄 Sequential vs Parallel Tasks**
 **Sequential:** Environment setup → Training data → Fine-tuning → Observability → Testing → Deployment
@@ -59,27 +61,34 @@ This document outlines all the components that need to be implemented to complet
 ---
 
 ## 🏗️ **Phase 2: Production Features**
+### 1. **Client SDK (PspRouter.Client)** ✅ **ADDED**
+- [x] Create `PspRouter.Client` project
+- [x] Implement `IPspDataProvider` with SQL Server queries from `PaymentTransactions`
+- [x] Implement `PspRouterClient` to build candidates and call API
+- [x] Add examples and README for sender integration
+- [ ] Package as NuGet and publish (optional)
 
-### 1. **Monitoring & Observability** ❌ **BASIC**
+
+### 2. **Monitoring & Observability** ❌ **BASIC**
 - [ ] Add structured logging with correlation IDs
 - [ ] Add metrics collection (authorization rates, response times, model performance)
 - [ ] Set up alerting for model failures and routing errors
 - [ ] Add distributed tracing for fine-tuned model calls
 - [ ] Monitor fine-tuned model performance and accuracy
 
-### 2. **Caching Layer** ❌ **MISSING**
+### 3. **Caching Layer** ❌ **MISSING**
 - [ ] Implement Redis caching for model responses
 - [ ] Cache merchant preferences and routing patterns
 - [ ] Implement cache invalidation strategies
 - [ ] Cache training data for model updates
 
-### 3. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
+### 4. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
 - [ ] Add rate limiting for API endpoints
 - [ ] Implement circuit breakers for OpenAI API calls
 - [ ] Add retry policies with exponential backoff
 - [ ] Implement fallback routing when model is unavailable
 
-### 4. **Security Enhancements** ⚠️ **BASIC**
+### 5. **Security Enhancements** ⚠️ **BASIC**
 - [ ] Add API authentication/authorization
 - [ ] Implement request/response encryption
 - [ ] Add input validation and sanitization
@@ -272,4 +281,4 @@ The library has minimal external dependencies:
 #### **Adding New PSPs**
 - [ ] Add new PSP data to training dataset
 - [ ] Retrain fine-tuned model with expanded data
-- [ ] Update PSP candidate lists in routing logic
+- [ ] Client surfaces PSPs in real time from `PaymentTransactions` (no static candidate lists)
