@@ -50,9 +50,11 @@ Instead of one complex model, we use four specialized models, each optimized for
 ```
 Transaction Request
         ↓
+    [PSP Candidates] ← Load from database (30-day historical data)
+        ↓
     [Guardrails] ← Filter valid PSPs (supports flag, health status, SCA compliance)
         ↓
-    [Main Model] ← Predict best PSP selection
+    [Main Model] ← Predict best PSP selection from filtered candidates
         ↓
     [Final Decision] ← Based on ML predictions
         ↓
@@ -74,17 +76,31 @@ The guardrail system applies multiple filters to ensure only valid PSPs are cons
 
 ## **3. Real-time Enhancement (The Feedback, The 3 Models, The Improvement of Candidates)**
 
-### **Feedback Loop Architecture**
+### **The 4 Models Decision Flow**
 ```
-Transaction → Routing Decision → PSP Processing → Feedback
-RouteInput → RouteDecision → PSP Response → TransactionFeedback
+Transaction Request
+        ↓
+    [PSP Candidates] ← Load from database (30-day historical data)
+        ↓
+    [Enriched PSP Candidates] ← The 3 auxiliary models ← Feedbacks collection
+        ↓
+    [Guardrails] ← Filter valid PSPs (supports flag, health status, SCA compliance)
+        ↓
+    [Main Model] ← Predict best PSP selection from filtered candidates
+        ↓
+    [Final Decision] ← Based on ML predictions
+        ↓
+    [Fallback] ← Deterministic scoring if ML fails
+        ↓
+    [Client] ← Route decision sent to client
+        ↓
+    [PSP Processing] ← Client processes transaction with chosen PSP
+        ↓
+    [Feedback Notification] ← Client sends back transaction outcome
+        ↓
+    [Feedback Collection Updating + Cached Performance Metrics Updating]
 ```
 
-**Model Update (Separate Process):**
-```
-Feedback → Check Conditions → Retrain Models (if conditions met)
-TransactionFeedback → Update Triggers → Retrain Models (separate execution)
-```
 
 ### **How Real-time Learning Works**
 
