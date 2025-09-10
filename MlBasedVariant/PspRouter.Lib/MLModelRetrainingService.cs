@@ -1,6 +1,7 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML;
-using Microsoft.Data.SqlClient;
+using System.Runtime;
 
 namespace PspRouter.Lib;
 
@@ -160,15 +161,74 @@ public class MLModelRetrainingService : IMLModelRetrainingService
 
     private async Task<List<TransactionFeedback>> CollectAllFeedbackDataAsync(CancellationToken cancellationToken)
     {
-        // Option 1: Collect feedback data from in-memory storage
-        // This is faster and more real-time but limited to recent data
+        // For now, we'll collect feedback data from the database
+        // In a production system, this could be from in-memory storage, message queues, etc.
         var allFeedback = new List<TransactionFeedback>();
         
-        // Get feedback from the performance predictor's in-memory storage
-        if (_performancePredictor != null)
+        try
         {
-            // This would need to be implemented in the predictor to expose its feedback data
-            // For now, we'll use the database approach
+            var connectionString = GetConnectionString();
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            
+            // Query to get recent transaction feedback data
+            var query = @"
+                SELECT TOP 1000
+                    pt.PaymentTransactionId as DecisionId,
+                    CAST(pt.PaymentGatewayId AS NVARCHAR(50)) as MerchantId,  -- Use PaymentGatewayId as MerchantId for now
+                    CAST(pt.PaymentGatewayId AS NVARCHAR(50)) as PspName,
+                    CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END as Authorized,
+                    pt.Amount as TransactionAmount,
+                    CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN pt.Amount * 0.025 ELSE 0 END as FeeAmount,
+                    CASE 
+                        WHEN pt.DateStatusLastUpdated IS NULL OR pt.DateCreated IS NULL THEN 0
+                        WHEN pt.DateStatusLastUpdated < pt.DateCreated THEN 0
+                        WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) > 30 THEN 0
+                        WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) < 0 THEN 0
+                        ELSE CAST(DATEDIFF(MINUTE, pt.DateCreated, pt.DateStatusLastUpdated) AS BIGINT) * 60000
+                    END as ProcessingTimeMs,
+                    CAST(50 AS INT) as RiskScore, -- Default risk score
+                    pt.DateCreated as ProcessedAt,
+                    CASE WHEN pt.PaymentTransactionStatusId NOT IN (5, 7, 9) THEN 'DECLINED' ELSE NULL END as ErrorCode,
+                    CASE WHEN pt.PaymentTransactionStatusId NOT IN (5, 7, 9) THEN 'Transaction declined' ELSE NULL END as ErrorMessage,
+                    'ml' as RoutingMethod
+                FROM PaymentTransactions pt
+                WHERE pt.DateCreated >= DATEADD(DAY, -7, GETDATE())  -- Last 7 days
+                    AND pt.PaymentGatewayId IS NOT NULL
+                    AND pt.PaymentTransactionStatusId IN (5, 7, 9, 11, 15, 17, 22)
+                ORDER BY pt.DateCreated DESC";
+            
+            using var command = new SqlCommand(query, connection);
+            command.CommandTimeout = 30;
+            
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var feedback = new TransactionFeedback(
+                    DecisionId: reader.GetString(0),
+                    MerchantId: reader.GetString(1),
+                    PspName: reader.GetString(2),
+                    Authorized: reader.GetInt32(3) == 1,
+                    TransactionAmount: reader.GetDecimal(4),
+                    FeeAmount: reader.GetDecimal(5),
+                    ProcessingTimeMs: reader.GetInt32(6),
+                    RiskScore: reader.GetInt32(7),
+                    ProcessedAt: reader.GetDateTime(8),
+                    ErrorCode: reader.IsDBNull(9) ? null : reader.GetString(9),
+                    ErrorMessage: reader.IsDBNull(10) ? null : reader.GetString(10),
+                    RoutingMethod: reader.GetString(11)
+                );
+                
+                allFeedback.Add(feedback);
+            }
+            
+            _logger.LogInformation("Collected {Count} feedback records for retraining", allFeedback.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error collecting feedback data for retraining");
+            // Return empty list if collection fails
         }
         
         return allFeedback;
@@ -176,11 +236,83 @@ public class MLModelRetrainingService : IMLModelRetrainingService
 
     private async Task<List<TransactionFeedback>> GetPspFeedbackDataAsync(string pspName, CancellationToken cancellationToken)
     {
-        // Option 1: Get feedback data from in-memory storage (fast, recent data only)
+        // Get feedback data for a specific PSP from the database
         var pspFeedback = new List<TransactionFeedback>();
         
-        // This would get feedback from the performance predictor's in-memory storage
-        // For now, we'll use the database approach
+        try
+        {
+            var connectionString = GetConnectionString();
+            using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            
+            // Get PSP ID from name
+            var pspId = GetPspIdFromName(pspName);
+            if (pspId == null)
+            {
+                _logger.LogWarning("PSP {PspName} not found in database", pspName);
+                return pspFeedback;
+            }
+            
+            // Query to get recent transaction feedback data for specific PSP
+            var query = @"
+                SELECT TOP 500
+                    pt.PaymentTransactionId as DecisionId,
+                    pt.MerchantId,
+                    CAST(pt.PaymentGatewayId AS NVARCHAR(50)) as PspName,
+                    CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END as Authorized,
+                    pt.Amount as TransactionAmount,
+                    CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN pt.Amount * 0.025 ELSE 0 END as FeeAmount,
+                    CASE 
+                        WHEN pt.DateStatusLastUpdated IS NULL OR pt.DateCreated IS NULL THEN 0
+                        WHEN pt.DateStatusLastUpdated < pt.DateCreated THEN 0
+                        WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) > 30 THEN 0
+                        WHEN DATEDIFF(DAY, pt.DateCreated, pt.DateStatusLastUpdated) < 0 THEN 0
+                        ELSE CAST(DATEDIFF(MINUTE, pt.DateCreated, pt.DateStatusLastUpdated) AS BIGINT) * 60000
+                    END as ProcessingTimeMs,
+                    CAST(50 AS INT) as RiskScore, -- Default risk score
+                    pt.DateCreated as ProcessedAt,
+                    CASE WHEN pt.PaymentTransactionStatusId NOT IN (5, 7, 9) THEN 'DECLINED' ELSE NULL END as ErrorCode,
+                    CASE WHEN pt.PaymentTransactionStatusId NOT IN (5, 7, 9) THEN 'Transaction declined' ELSE NULL END as ErrorMessage,
+                    'ml' as RoutingMethod
+                FROM PaymentTransactions pt
+                WHERE pt.PaymentGatewayId = @PspId
+                    AND pt.DateCreated >= DATEADD(DAY, -7, GETDATE())  -- Last 7 days
+                    AND pt.PaymentTransactionStatusId IN (5, 7, 9, 11, 15, 17, 22)
+                ORDER BY pt.DateCreated DESC";
+            
+            using var command = new SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@PspId", pspId);
+            command.CommandTimeout = 30;
+            
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var feedback = new TransactionFeedback(
+                    DecisionId: reader.GetString(0),
+                    MerchantId: reader.GetString(1),
+                    PspName: reader.GetString(2),
+                    Authorized: reader.GetInt32(3) == 1,
+                    TransactionAmount: reader.GetDecimal(4),
+                    FeeAmount: reader.GetDecimal(5),
+                    ProcessingTimeMs: reader.GetInt32(6),
+                    RiskScore: reader.GetInt32(7),
+                    ProcessedAt: reader.GetDateTime(8),
+                    ErrorCode: reader.IsDBNull(9) ? null : reader.GetString(9),
+                    ErrorMessage: reader.IsDBNull(10) ? null : reader.GetString(10),
+                    RoutingMethod: reader.GetString(11)
+                );
+                
+                pspFeedback.Add(feedback);
+            }
+            
+            _logger.LogInformation("Collected {Count} feedback records for PSP {PspName}", pspFeedback.Count, pspName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error collecting feedback data for PSP {PspName}", pspName);
+            // Return empty list if collection fails
+        }
         
         return pspFeedback;
     }
@@ -295,9 +427,21 @@ public class MLModelRetrainingService : IMLModelRetrainingService
 
     private string GetConnectionString()
     {
-        // This would need to be injected or retrieved from configuration
-        // For now, return a placeholder
-        return "Server=localhost;Database=PaymentDB;Trusted_Connection=true;";
+        // Get .env file variable
+        var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION")
+            ?? throw new InvalidOperationException("PSPROUTER_DB_CONNECTION environment variable is required");
+        
+        /* TODO: Fix tis
+        // Ensure TrustServerCertificate=true is included to handle SSL certificate issues
+        if (_settings.TrustServerCertificate && !baseConnectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase))
+        {
+            return baseConnectionString.TrimEnd(';') + ";TrustServerCertificate=true;";
+        }*/
+
+        return baseConnectionString.TrimEnd(';') + ";TrustServerCertificate=true;";
+
+
+        return baseConnectionString;
     }
 
     private List<PspPerformanceFeatures> ConvertFeedbackToFeatures(List<TransactionFeedback> feedback)
