@@ -61,8 +61,10 @@ public class PspPerformancePredictor : IPspPerformancePredictor
         {
             if (!_models.TryGetValue(pspName, out var model))
             {
-                _logger.LogWarning("No performance model found for PSP {PspName}, using default rate", pspName);
-                return Task.FromResult(0.85); // Default success rate
+                // Create a new model for this PSP if it doesn't exist
+                model = new PspPerformanceModel(pspName);
+                _models[pspName] = model;
+                _logger.LogDebug("Created new performance model for PSP {PspName}", pspName);
             }
             
             return Task.FromResult(model.PredictSuccessRate(transaction));
@@ -75,8 +77,10 @@ public class PspPerformancePredictor : IPspPerformancePredictor
         {
             if (!_models.TryGetValue(pspName, out var model))
             {
-                _logger.LogWarning("No performance model found for PSP {PspName}, using default processing time", pspName);
-                return Task.FromResult(2000); // Default 2 seconds
+                // Create a new model for this PSP if it doesn't exist
+                model = new PspPerformanceModel(pspName);
+                _models[pspName] = model;
+                _logger.LogDebug("Created new performance model for PSP {PspName}", pspName);
             }
             
             return Task.FromResult(model.PredictProcessingTime(transaction));
@@ -89,8 +93,10 @@ public class PspPerformancePredictor : IPspPerformancePredictor
         {
             if (!_models.TryGetValue(pspName, out var model))
             {
-                _logger.LogWarning("No performance model found for PSP {PspName}, using default health", pspName);
-                return Task.FromResult("yellow"); // Default health
+                // Create a new model for this PSP if it doesn't exist
+                model = new PspPerformanceModel(pspName);
+                _models[pspName] = model;
+                _logger.LogDebug("Created new performance model for PSP {PspName}", pspName);
             }
             
             return Task.FromResult(model.PredictHealthStatus());
