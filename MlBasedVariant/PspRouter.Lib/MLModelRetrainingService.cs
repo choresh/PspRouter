@@ -73,7 +73,7 @@ public class MLModelRetrainingService : IMLModelRetrainingService
                 return;
             }
             
-            _logger.LogInformation("Collected {Count} feedback records for retraining", allFeedbackData.Count);
+            _logger.LogInformation("Collected {Count} historical transaction records from database for retraining", allFeedbackData.Count);
             
             // 2. Retrain each PSP's models
             var pspNames = allFeedbackData.Select(f => f.PspName).Distinct().ToList();
@@ -161,8 +161,8 @@ public class MLModelRetrainingService : IMLModelRetrainingService
 
     private async Task<List<TransactionFeedback>> CollectAllFeedbackDataAsync(CancellationToken cancellationToken)
     {
-        // For now, we'll collect feedback data from the database
-        // In a production system, this could be from in-memory storage, message queues, etc.
+        // Collect historical transaction data from the database for ML model retraining
+        // This provides robust training data from real historical transactions
         var allFeedback = new List<TransactionFeedback>();
         
         try
@@ -171,7 +171,7 @@ public class MLModelRetrainingService : IMLModelRetrainingService
             using var connection = new SqlConnection(connectionString);
             await connection.OpenAsync(cancellationToken);
             
-            // Query to get recent transaction feedback data
+            // Query to get historical transaction data for ML model training
             var query = @"
                 SELECT TOP 1000
                     pt.PaymentTransactionId as DecisionId,
