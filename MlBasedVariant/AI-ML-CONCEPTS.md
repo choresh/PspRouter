@@ -23,10 +23,18 @@ ML.NET is Microsoft's open-source machine learning framework for .NET developers
 ### **Why Four Models?**
 Instead of one complex model, we use four specialized models, each optimized for a specific prediction task:
 
-1. **Success Rate Model**: Predicts authorization probability (Binary Classification)
-2. **Processing Time Model**: Predicts transaction processing time (Regression)
-3. **Health Status Model**: Predicts PSP health classification (Multiclass Classification)
-4. **Overall Routing Model**: Predicts best PSP selection (Binary Classification)
+1. **Main Model**:
+   - **Goal**: Predicts best PSP selection (Binary Classification)
+   - **Training Data**: Massive historical dataset from PaymentTransactions table (trained once)
+   - **Update Stage**: Never updated - provides stable baseline intelligence
+
+2. **Auxiliary Models**:
+   - **Goal**: Provide real-time performance predictions for each PSP
+   - **Training Data**: Recent transaction data from PaymentTransactions table (last 7 days)
+   - **Update Stage**: Continuously retrained with fresh data when triggers occur
+   - **Success Rate Model**: Predicts authorization probability (Binary Classification)
+   - **Processing Time Model**: Predicts transaction processing time (Regression)
+   - **Health Status Model**: Predicts PSP health classification (Multiclass Classification)
 
 ### **Model Architecture**
 ```
@@ -232,12 +240,17 @@ RouteInput → RouteDecision → PSP Response → TransactionFeedback → Retrai
 - **Training**: Trained once on massive historical dataset from PaymentTransactions table
 - **Usage**: Provides baseline intelligent routing decisions
 
-**2. Three Auxiliary Models (Real-time Learning)**
-- **Success Rate Model**: Predicts authorization probability based on recent performance
-- **Processing Time Model**: Predicts transaction processing time based on recent data  
-- **Health Status Model**: Predicts PSP health classification (green/yellow/red)
-- **Characteristics**: Continuously updated with real-time feedback and retrained with fresh data
-- **Training**: Retrained periodically using fresh data from monolith's database
+**2. Three Auxiliary Models (Periodic Retraining)**
+- **Characteristics**: Retrained periodically (every 24 hours or when triggers occur) using fresh data from database
+- **Training**: Retrained using small amount of PaymentTransactions data from monolith's database (last 7 days)
+- **Update Triggers**: 
+  - Never retrained before
+  - Last retraining was more than 24 hours ago
+  - Performance predictor indicates retraining needed
+- **The 3 Auxiliary Models**:
+  - **Success Rate Model**: Predicts authorization probability based on recent performance
+  - **Processing Time Model**: Predicts transaction processing time based on recent data  
+  - **Health Status Model**: Predicts PSP health classification (green/yellow/red)
 
 #### **PSP Candidates Collection and Usage**
 
