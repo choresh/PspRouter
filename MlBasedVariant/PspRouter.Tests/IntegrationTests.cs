@@ -24,8 +24,11 @@ public class IntegrationTests
                 "Server=localhost;Database=PaymentDB;Trusted_Connection=true;TrustServerCertificate=true;");
         }
         
-        // 1. Setup the system
-        var logger = new MockLogger<IntegrationTests>();
+        // 1. Setup the system with console logging
+        var loggerFactory = LoggerFactory.Create(builder =>
+            builder.AddConsole().SetMinimumLevel(LogLevel.Information));
+        
+        var logger = loggerFactory.CreateLogger<IntegrationTests>();
         var settings = new PspCandidateSettings
         {
             TrustServerCertificate = true,
@@ -36,19 +39,19 @@ public class IntegrationTests
         };
         
         // Create ML performance predictor
-        var performancePredictor = new PspPerformancePredictor(new MockLogger<PspPerformancePredictor>(), settings);
+        var performancePredictor = new PspPerformancePredictor(loggerFactory.CreateLogger<PspPerformancePredictor>(), settings);
         
         // Create ML retraining service
-        var retrainingService = new MLModelRetrainingService(new MockLogger<MLModelRetrainingService>(), performancePredictor);
+        var retrainingService = new MLModelRetrainingService(loggerFactory.CreateLogger<MLModelRetrainingService>(), performancePredictor);
         
         // Create PSP candidate provider with ML enhancement
-        var candidateProvider = new PspCandidateProvider(new MockLogger<PspCandidateProvider>(), settings, performancePredictor, retrainingService);
+        var candidateProvider = new PspCandidateProvider(loggerFactory.CreateLogger<PspCandidateProvider>(), settings, performancePredictor, retrainingService);
         
         // Create prediction service (mock for now)
         var predictionService = new MockPredictionService();
         
         // Create router
-        var router = new Router(predictionService, candidateProvider, new MockLogger<Router>());
+        var router = new Router(predictionService, candidateProvider, loggerFactory.CreateLogger<Router>());
         
         logger.LogInformation("🚀 Starting ML-Enhanced PSP Routing Integration Test");
         
