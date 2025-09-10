@@ -277,15 +277,15 @@ RouteInput → RouteDecision → PSP Response → TransactionFeedback → Retrai
 
 
 ### **Cached Feedback System**
-TODO: Explain verbaly
+The system maintains an in-memory cache of recent transaction feedback for each PSP. When feedback is received, it's stored in the cache (limited to last 1000 transactions per PSP) and used to immediately update cached performance metrics like success rate, processing time, and health status. This provides real-time performance updates without requiring database queries for every prediction.
 
 ### **Incremental Learning**
-TODO: Explain verbaly
+The system supports incremental learning where auxiliary models can be updated with new feedback data without full retraining. When feedback is received, the system checks if incremental updates are needed based on data volume and time thresholds. This allows for faster adaptation to changing PSP performance patterns while maintaining model stability.
 
 ### **Guardrails System**
 
 #### **Guardrail Logic**
-TODO: Explain verbaly
+The guardrail system applies multiple filters to ensure only valid PSPs are considered for routing. It filters PSPs by support status (must be marked as supported), health status (only green or yellow PSPs allowed), and SCA compliance (if transaction requires SCA and is a card payment, PSP must support 3DS). This pre-filtering reduces decision complexity and ensures compliance with business rules and regulatory requirements.
 
 #### **Guardrail Types**
 1. **Supports Flag**: Boolean indicator that PSP is available for routing
