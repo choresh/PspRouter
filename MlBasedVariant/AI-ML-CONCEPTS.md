@@ -1,50 +1,92 @@
 # 📚 AI/ML Concepts Explained for Programmers (ML-Based variant)
 
 ## **A.0 Overview**
-This document explains the key AI/ML concepts used in the PSP Router in programmer-friendly terms. The system uses a **fine-tuned model approach** where the AI learns everything from historical transaction data, eliminating the need for external providers and tool calling. No advanced mathematics required - just practical understanding of how these concepts work in our payment routing system.
+This document explains the key AI/ML concepts used in the PSP Router in programmer-friendly terms. The system uses **ML.NET with LightGBM** to create three specialized ML models that predict PSP performance, eliminating the need for external providers. No advanced mathematics required - just practical understanding of how these concepts work in our payment routing system.
 
 
-## 🧠 **A.7 LLM (Large Language Model): The AI Brain**
+## 🧠 **A.1 ML.NET: The Machine Learning Framework**
 
-### **What is an LLM?**
-A Large Language Model is an AI system trained on vast amounts of text data that can understand and generate human-like text. In our case, we use a **fine-tuned GPT model** that has been specifically trained on historical payment routing data to make intelligent routing decisions.
+### **What is ML.NET?**
+ML.NET is Microsoft's open-source machine learning framework for .NET developers. It allows us to build, train, and deploy ML models directly in our C# application without external dependencies. In our PSP Router, we use ML.NET to create three specialized models that predict different aspects of PSP performance.
 
 ### **How It Works**
 ```
-Input: Transaction context + PSP candidates
-↓
-ML-Based Processing: Analyzes context using learned patterns from historical data
-↓
-Output: Structured decision with reasoning based on training data
+Historical Transaction Data → Feature Engineering → Model Training → Real-time Predictions
+PaymentTransactions table → PspPerformanceFeatures → LightGBM Models → PSP Performance Scores
 ```
 
-### **Why It's Powerful**
-- **Context Understanding**: Considers complex relationships learned from training data
-- **Reasoning**: Can explain its decisions based on historical patterns
-- **Flexibility**: Handles edge cases using learned knowledge
-- **Domain Expertise**: Specialized knowledge from payment routing training data
+### **Why ML.NET is Perfect for PSP Routing**
+- **No External Dependencies**: Everything runs in-process with our .NET application
+- **High Performance**: Optimized for production workloads with fast inference
+- **Type Safety**: Strongly-typed C# code with IntelliSense support
+- **Easy Deployment**: Models are just files that can be versioned and deployed
+- **Real-time Learning**: Models can be retrained with new data without downtime
 
 ### **In PSP Router**
 ```csharp
-// Fine-tuned model receives comprehensive context
-var context = {
-    Transaction: currentTx,
-    Candidates: validCandidates,
-    MerchantPreferences: preferences
-};
+// ML.NET context for all ML operations
+var mlContext = new MLContext(seed: 42);
 
-// Fine-tuned model makes intelligent decision using learned patterns
-var decision = await fineTunedModel.CompleteJson(systemPrompt, userInstruction, context);
-// Result: {"schema_version":"1.0","decision_id":"route_001","candidate":"Stripe","alternates":["Adyen"],"reasoning":"Best for high-risk SCA transactions based on historical data","guardrail":"none","constraints":{"must_use_3ds":true,"retry_window_ms":8000,"max_retries":1},"features_used":["sca_required=true","auth_rate=0.89"]}
+// Load trained model from disk
+var model = mlContext.Model.Load(modelPath, out var schema);
+
+// Make real-time predictions
+var prediction = model.Transform(inputData);
 ```
 
 ---
 
-## 🧠 **A.9 ML-Based's Role in PSP Routing: The Intelligent Decision Engine**
+## 🎯 **A.2 Four-Model Architecture: Specialized Prediction System**
+
+### **Why Four Models?**
+Instead of one complex model, we use four specialized models, each optimized for a specific prediction task:
+
+1. **Success Rate Model**: Predicts authorization probability (Binary Classification)
+2. **Processing Time Model**: Predicts transaction processing time (Regression)
+3. **Health Status Model**: Predicts PSP health classification (Multiclass Classification)
+4. **Overall Routing Model**: Predicts best PSP selection (Binary Classification)
+
+### **Model Architecture**
+```
+Transaction Input → Feature Engineering → Four Specialized Models → Combined Decision
+RouteInput → PspPerformanceFeatures → [Success Rate, Processing Time, Health, Overall Routing] → RouteDecision
+```
+
+### **Benefits of Four-Model Approach**
+- **Specialized Accuracy**: Each model is optimized for its specific task
+- **Independent Training**: Models can be retrained separately based on data availability
+- **Fault Tolerance**: If one model fails, others continue working
+- **Performance**: Smaller, focused models are faster than one large model
+- **Interpretability**: Easier to understand what each model is predicting
+- **Layered Decision Making**: Overall routing model combines insights from specialized models
+
+---
+
+## 🌳 **A.3 LightGBM: The Gradient Boosting Algorithm**
+
+### **What is LightGBM?**
+LightGBM (Light Gradient Boosting Machine) is a fast, distributed, high-performance gradient boosting framework. It's particularly effective for tabular data like our transaction features and is the core algorithm powering all four of our ML models.
+
+### **How LightGBM Works**
+```
+Training Data → Decision Trees → Gradient Boosting → Ensemble Model
+Features + Labels → Multiple Trees → Learn from Errors → Final Predictor
+```
+
+### **Why LightGBM for PSP Routing**
+- **Handles Mixed Data Types**: Works well with both numerical and categorical features
+- **Feature Importance**: Automatically identifies which features matter most
+- **Fast Training**: Efficiently trains on large datasets
+- **Robust Predictions**: Less prone to overfitting than other algorithms
+- **Production Ready**: Optimized for real-time inference
+
+---
+
+## 🧠 **A.4 ML-Based's Role in PSP Routing: The Intelligent Decision Engine**
 
 ### **Primary Function: Intelligent Decision Engine**
 
-The fine-tuned model serves as the **brain** of the PSP Router, acting as an expert payment routing consultant that makes complex, context-aware decisions based on learned patterns from historical transaction data. It's the primary decision maker that considers multiple factors simultaneously and provides reasoning for its choices.
+The ML models serve as the **brain** of the PSP Router, acting as expert payment routing consultants that make complex, context-aware decisions based on learned patterns from historical transaction data. They're the primary decision makers that consider multiple factors simultaneously and provide reasoning for their choices.
 
 ### **Decision Flow**
 
@@ -53,15 +95,17 @@ Transaction Request
         ↓
     [Guardrails] ← Filter valid PSPs (supports flag, health status, SCA compliance)
         ↓
-    [ML-Based] ← Primary intelligent routing using learned patterns from training
+    [ML Models] ← Predict success rate, processing time, health status
         ↓
-    [Success?] ← Model response valid?
+    [Scoring] ← Combine ML predictions with business logic
         ↓
-    [Final Decision] ← Based on learned patterns
+    [Success?] ← ML prediction valid?
         ↓
-    [Fallback] ← Deterministic scoring if model fails
+    [Final Decision] ← Based on ML predictions
         ↓
-    [Final Decision] ← Based on mathematical scoring (auth rate - fees)
+    [Fallback] ← Deterministic scoring if ML fails
+        ↓
+    [Final Decision] ← Based on mathematical scoring
 ```
 
 ### **ML-Based Routing Algorithm (Step-by-step)**
@@ -71,47 +115,38 @@ Transaction Request
    - Filter by health status (green/yellow only, excludes red)
    - Filter by SCA compliance (if SCA required for cards, PSP must support 3DS)
 
-2. **Inputs prepared**
-   - Valid PSP candidates after guardrails
-   - Transaction context and PSP performance data
+2. **ML Predictions Generated**
+   - **Success Rate**: Predict authorization probability for each PSP
+   - **Processing Time**: Predict transaction processing time
+   - **Health Status**: Predict current PSP health classification
 
-3. **Context built for the fine-tuned model**
-   - Serialize a structured object with: `Transaction`, `Candidates`, `Weights`
+3. **Scoring and Selection**
+   - Combine ML predictions with business weights
+   - Apply business bias and preferences
+   - Select PSP with highest combined score
 
-4. **Prompting**
-   - Construct a strict system prompt with rules and response schema
-   - Provide a short user instruction: "Route this payment…"
+4. **Success or Fallback**
+   - If ML predictions valid → return ML-based decision
+   - If ML predictions fail → fallback to deterministic scoring
 
-5. **Inference**
-   - Call the fine-tuned model to produce a JSON decision using learned patterns from training data
-   - Model uses current transaction context, PSP snapshots, and product-defined `Weights`
-
-6. **Validation**
-   - Parse JSON to a `RouteDecision`
-   - Ensure the chosen `Candidate` is one of the valid PSPs
-
-7. **Success or Fallback**
-   - If valid → return the fine-tuned model decision
-   - If invalid/failed → fallback to deterministic scoring
-
-8. **Deterministic Fallback** (if needed)
+5. **Deterministic Fallback** (if needed)
    - Score PSPs by: `AuthRate30d - (FeeBps/10000.0) - (FixedFee/Amount)`
    - Select highest-scoring PSP
    - Return deterministic decision
 
-#### Code entry points
-- `PspRouter.Decide(...)` orchestrates fine-tuned model routing with fallback
-- `PspRouter.DecideWithLLM(...)` handles fine-tuned model inference
-- `PspRouter.ScoreDeterministically(...)` provides mathematical fallback
-- `PspRouter.BuildSystemPrompt()` defines the strict schema and rules
+#### Code entry points (used by controller)
+- `Router.Decide(...)` - Main routing endpoint called by `/api/v1/routing/route`
+- `PspCandidateProvider.ProcessFeedback(...)` - Feedback processing called by `/api/v1/routing/feedback`
+- `PspCandidateProvider.GetAllCandidates(...)` - PSP candidates retrieval called by `/api/v1/routing/candidates`
+- `IPredictionService.IsModelLoaded` - ML model status check called by `/api/v1/routing/ml-status`
 
 ### **Deterministic Fallback System**
 
 #### **When Fallback is Used**
-- Fine-tuned model fails to respond
-- Model response is invalid JSON
-- Model chooses an invalid PSP
-- Model response times out
+- ML models fail to load
+- ML predictions are invalid or timeout
+- ML models choose an invalid PSP
+- ML prediction service is unavailable
 
 #### **Fallback Algorithm**
 ```csharp
@@ -125,8 +160,157 @@ var best = candidates.OrderByDescending(c => score).First();
 #### **Fallback Benefits**
 - **Reliability**: Always provides a decision
 - **Transparency**: Clear mathematical scoring
-- **Performance**: Fast execution without AI inference
+- **Performance**: Fast execution without ML inference
 - **Consistency**: Predictable results for same inputs
+
+---
+
+## 🔧 **A.5 Feature Engineering: Transforming Raw Data into ML Features**
+
+### **What is Feature Engineering?**
+Feature engineering is the process of transforming raw transaction data into meaningful features that ML models can understand and learn from. It's like translating business logic into mathematical representations.
+
+### **Our Feature Set**
+```csharp
+public class PspPerformanceFeatures
+{
+    // Transaction Context Features
+    public float Amount { get; set; }                    // Transaction amount
+    public float PaymentMethodId { get; set; }          // Card, PayPal, etc.
+    public float CurrencyId { get; set; }               // USD, EUR, etc.
+    public float CountryId { get; set; }                // Geographic location
+    public float RiskScore { get; set; }                // Risk assessment (0-100)
+    public float IsTokenized { get; set; }              // Tokenized payment (0/1)
+    public float HasThreeDS { get; set; }               // 3D Secure enabled (0/1)
+    public float IsRerouted { get; set; }               // Retry transaction (0/1)
+    
+    // PSP Identification
+    public float PspId { get; set; }                    // PSP identifier
+    public string PspName { get; set; }                 // PSP name
+    
+    // Temporal Features
+    public float HourOfDay { get; set; }                // 0-23
+    public float DayOfWeek { get; set; }                // 0-6 (Sunday=0)
+    public float DayOfMonth { get; set; }               // 1-31
+    public float MonthOfYear { get; set; }              // 1-12
+    
+    // Historical Performance Features
+    public float RecentSuccessRate { get; set; }        // Last 7 days auth rate
+    public float RecentProcessingTime { get; set; }     // Last 7 days avg time
+    public float RecentVolume { get; set; }             // Last 7 days transaction count
+    
+    // Derived Features
+    public float AmountLog { get; set; }                // log10(amount) for normalization
+    public float RiskAdjustedAmount { get; set; }       // amount * (1 - risk_score/100)
+    public float TimeOfDayCategory { get; set; }        // 0=night, 1=morning, 2=afternoon, 3=evening
+}
+```
+
+### **Feature Engineering Pipeline**
+```csharp
+// 1. Concatenate all features into a single vector
+var pipeline = _mlContext.Transforms.Concatenate("Features", 
+    nameof(PspPerformanceFeatures.Amount),
+    nameof(PspPerformanceFeatures.PaymentMethodId),
+    nameof(PspPerformanceFeatures.CurrencyId),
+    // ... all other features
+);
+
+// 2. Normalize features to 0-1 range for better training
+.Append(_mlContext.Transforms.NormalizeMinMax("Features"));
+
+// 3. Train the model
+.Append(_mlContext.BinaryClassification.Trainers.LightGbm(...));
+```
+
+### **Why These Features Matter**
+- **Transaction Context**: Amount, payment method, currency affect PSP performance
+- **Temporal Patterns**: Time of day, day of week influence success rates
+- **Historical Performance**: Recent PSP performance predicts future behavior
+- **Risk Factors**: Risk score and tokenization affect authorization rates
+- **Derived Features**: Mathematical combinations capture complex relationships
+
+---
+
+## 🔄 **A.6 Real-time Learning: Continuous Model Improvement**
+
+### **Feedback Loop Architecture**
+```
+Transaction → Routing Decision → PSP Processing → Feedback → Model Update
+RouteInput → RouteDecision → PSP Response → TransactionFeedback → Retrain Models
+```
+
+### **How Real-time Learning Works**
+1. **Transaction Processing**: Route transaction using current ML models
+2. **Feedback Collection**: Collect actual PSP performance (success/failure, processing time)
+3. **Cached Feedback Storage**: Store feedback in in-memory cache (last 1000 transactions per PSP)
+4. **Real-time Cache Updates**: Update cached performance metrics immediately
+5. **Model Update**: Retrain models with accumulated cached feedback data
+6. **Model Deployment**: Replace old models with improved versions
+
+### **Retraining Triggers**
+```csharp
+public bool ShouldRetrainModels()
+{
+    return _lastRetraining == DateTime.MinValue ||           // Never retrained
+           DateTime.UtcNow - _lastRetraining > TimeSpan.FromHours(24) || // 24 hours elapsed
+           _performancePredictor.ShouldRetrain();            // Performance degraded
+}
+```
+
+### **Cached Feedback System**
+```csharp
+// Store feedback in in-memory cache
+public void UpdateWithFeedback(TransactionFeedback feedback)
+{
+    lock (_lock)
+    {
+        _recentFeedback.Add(feedback);
+        
+        // Keep only recent feedback (last 1000 transactions)
+        if (_recentFeedback.Count > 1000)
+        {
+            _recentFeedback.RemoveAt(0);
+        }
+        
+        // Update cached values immediately
+        UpdateCachedValues();
+    }
+}
+
+// Real-time cache updates
+private void UpdateCachedValues()
+{
+    if (_recentFeedback.Count == 0) return;
+    
+    // Calculate success rate from cached feedback
+    var successful = _recentFeedback.Count(f => f.Authorized);
+    _cachedSuccessRate = (double)successful / _recentFeedback.Count;
+    
+    // Calculate average processing time from cached feedback
+    _cachedProcessingTime = (int)_recentFeedback.Average(f => f.ProcessingTimeMs);
+    
+    // Determine health status from cached metrics
+    if (_cachedSuccessRate >= 0.9 && _cachedProcessingTime <= 2000)
+        _cachedHealthStatus = "green";
+    else if (_cachedSuccessRate >= 0.8 && _cachedProcessingTime <= 3000)
+        _cachedHealthStatus = "yellow";
+    else
+        _cachedHealthStatus = "red";
+}
+```
+
+### **Incremental Learning**
+```csharp
+// Update models with new feedback
+await _performancePredictor.UpdateWithFeedback(feedback);
+
+// Trigger retraining if needed
+if (_retrainingService.ShouldRetrainModels())
+{
+    await _retrainingService.RetrainPspModelAsync(pspName);
+}
+```
 
 ### **Guardrails System**
 
@@ -261,189 +445,128 @@ The fine-tuned model transforms the PSP Router into an **intelligent payment exp
 
 This makes the system capable of handling real-world payment routing scenarios that require expert-level decision making, using pre-trained patterns from historical transaction data.
 
-## ⚙️ **A.10 ML-Based Approach**
+## 🎯 **A.7 Benefits of ML.NET-Based Approach**
 
-### **What "fine-tuned" means here**
-- Starts from a foundation LLM (e.g., GPT-3.5-turbo) and adapts it with your labeled payment routing data
-- Decision quality comes from learned weights + strict JSON schema + runtime context
-- Model learns PSP patterns, fees, capabilities, and routing logic from historical transaction data
-- No external providers needed - everything is learned from training data
+### **Why This Approach**
+- **No External Dependencies**: Everything runs in-process
+- **High Performance**: Optimized for production workloads
+- **Real-time Learning**: Models improve with new data
+- **Type Safety**: Strongly-typed C# code
+- **Easy Deployment**: Models are just files
+- **Cost Effective**: No external API costs
+- **Data Privacy**: All data stays within your infrastructure
 
-### **Why this approach**
-- **Consistency**: Higher schema adherence and decision consistency
-- **Efficiency**: Lower tokens and latency at scale
-- **Control**: Encodes domain expertise directly in model weights
-- **Simplicity**: No external API dependencies or real-time data fetching
-- **Reliability**: No external service failures or timeouts
+### **What the Models Learn**
+- **PSP Performance Patterns**: Success rates and response times from historical data
+- **Transaction Characteristics**: How different transaction types affect PSP performance
+- **Temporal Patterns**: Time-based variations in PSP performance
+- **Risk Assessment**: How risk factors influence authorization rates
+- **Compliance Requirements**: SCA/3DS requirements and their impact
 
-### **What the model learns**
-- **PSP Health Patterns**: Success rates and response times from historical data
-- **Fee Structures**: Actual costs and outcomes from past transactions
-- **PSP Capabilities**: Which PSPs work best for different payment methods, currencies, regions
-- **Complex Routing Logic**: Multi-factor decision making from training examples
-- **Compliance Rules**: SCA/3DS requirements and regulatory patterns
-- **Merchant Patterns**: Patterns from merchant-specific routing outcomes
+### **Operational Benefits**
+- **Automated Retraining**: Models improve automatically with new data
+- **Performance Monitoring**: Real-time tracking of model accuracy
+- **Fault Tolerance**: Fallback to deterministic routing if ML fails
+- **Scalability**: Models can handle high transaction volumes
+- **Maintainability**: Easy to update and improve models
 
-### **Training data format**
-```json
-{
-  "messages": [
-    {
-      "role": "system",
-      "content": "You are a payment routing expert. Route transactions to optimal PSPs based on historical patterns."
-    },
-    {
-      "role": "user", 
-      "content": "Route this transaction: {\"merchantId\":\"M001\",\"amount\":150.00,\"currencyId\":1,\"paymentMethodId\":1,\"paymentCardBin\":\"411111\",\"scaRequired\":false,\"riskScore\":15}"
-    },
-    {
-      "role": "assistant",
-      "content": "{\"schema_version\":\"1.0\",\"decision_id\":\"route_20241201_001\",\"candidate\":\"Stripe\",\"alternates\":[\"Adyen\"],\"reasoning\":\"Chose Stripe for optimal auth rate and fee structure for this transaction type\",\"guardrail\":\"none\",\"constraints\":{\"must_use_3ds\":false,\"retry_window_ms\":8000,\"max_retries\":1},\"features_used\":[\"auth_rate=0.89\",\"fee_bps=200\"]}"
-    }
-  ]
-}
-```
-
-### **Trade-offs**
-- **Data/MLOps**: Requires curated dataset, training, evaluation, versioning
-- **Drift**: Periodic re-training when transaction patterns change
-- **Training Time**: Initial training and retraining cycles
-- **Data Quality**: Requires high-quality labeled routing examples
-
-### **When to fine-tune**
-- You have enough high-quality labeled routing examples (1000+ recommended)
-- Transaction patterns are relatively stable
-- You want consistent, fast routing decisions
-- You want to eliminate external API dependencies
-
-### **Operational guidance**
-- **Training**: Use PspRouter.Trainer service for automated training workflow
-- **Versioning**: Track fine-tune versions and rollout gradually (shadow/A-B)
-- **Observability**: Log model latency, token usage, decision accuracy
-- **Retraining**: Schedule periodic retraining with new transaction data
-
-### **Evaluation checklist**
-- Authorization rate (primary), fee impact, decision accuracy
-- Decision time (P50/P95), schema validity, reasoning quality
-- A/B or shadow tests before rollout
-- Model performance on holdout test data
-
-### **Security & privacy**
-- Avoid PII; send only needed aggregates (e.g., BIN prefix, currency IDs, ranges)
-- Redact merchant and cardholder identifiers; follow data residency policies
-- Review provider data retention settings (ephemeral vs stored)
-- Use de-identified training data with proper data governance
-
-## 🎓 **A.11 Training Data: The Foundation of ML-Baseds**
+## 🎓 **A.8 Training Data: The Foundation of ML Models**
 
 ### **What is Training Data?**
-Training data is the **labeled examples** that teach the fine-tuned model how to make routing decisions. Each example shows a transaction input and the optimal routing decision, allowing the model to learn patterns and relationships.
+Training data is the **labeled examples** that teach our ML models how to make predictions. Each example shows a transaction input and the actual PSP performance outcome, allowing the models to learn patterns and relationships.
 
 ### **How Training Data Works**
 ```
-Historical Transaction → Optimal Decision → Training Example
-"Visa $150, US merchant" → "Route to Stripe" → Model learns this pattern
+Historical Transaction → Actual Outcome → Training Example
+"Visa $150, US merchant" → "Success: 1, Time: 1200ms, Health: Green" → Model learns this pattern
 ```
 
-### **Training Data Format**
-
-#### **JSONL (JSON Lines) Format**
-Each line is a separate training example:
-```json
-{"messages": [{"role": "system", "content": "You are a payment routing expert..."}, {"role": "user", "content": "Route this transaction: {...}"}, {"role": "assistant", "content": "{\"candidate\":\"Stripe\",\"reasoning\":\"...\"}"}]}
-{"messages": [{"role": "system", "content": "You are a payment routing expert..."}, {"role": "user", "content": "Route this transaction: {...}"}, {"role": "assistant", "content": "{\"candidate\":\"Adyen\",\"reasoning\":\"...\"}"}]}
-```
-
-### **Data Collection Process**
-
-#### **1. Historical Transaction Analysis**
+### **Training Data Source**
 ```sql
--- Extract successful routing decisions from PaymentTransactions table
+-- Extract training data from PaymentTransactions table
 SELECT 
-    MerchantId, Amount, CurrencyId, PaymentMethodId, PaymentCardBin,
-    PspName, AuthorizationResult, ProcessingTimeMs, FeeAmount
-FROM PaymentTransactions 
-WHERE AuthorizationResult = 'Authorized'
-  AND ProcessingTimeMs < 5000  -- Only fast transactions
-ORDER BY ProcessingTimeMs ASC
+    pt.PaymentTransactionId,
+    pt.Amount,
+    pt.PaymentMethodId,
+    pt.CurrencyId,
+    pt.PaymentGatewayId as PspId,
+    pt.PaymentTransactionStatusId,
+    pt.DateCreated,
+    pt.DateStatusLastUpdated,
+    CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END as IsSuccessful,
+    DATEDIFF(MILLISECOND, pt.DateCreated, pt.DateStatusLastUpdated) as ProcessingTimeMs
+FROM PaymentTransactions pt
+WHERE pt.DateCreated >= DATEADD(MONTH, -3, GETDATE())
+  AND pt.PaymentGatewayId IS NOT NULL
 ```
 
-#### **2. Data Preparation**
-- **De-identify**: Remove PII, use BIN prefixes instead of full card numbers
-- **Normalize**: Standardize currency IDs, payment method IDs
-- **Label**: Create optimal routing decisions based on outcomes
-- **Validate**: Ensure data quality and consistency
+### **Data Quality Requirements**
+- **Volume**: Minimum 1,000 examples per PSP, recommended 10,000+
+- **Diversity**: Cover different transaction types, amounts, currencies, times
+- **Freshness**: Recent data reflecting current PSP performance
+- **Accuracy**: Only use reliable, validated transaction outcomes
 
-#### **3. Training Example Creation**
+### **Feature Engineering from Raw Data**
 ```csharp
-// Convert historical transaction to training example
-var trainingExample = new {
-    messages = new[] {
-        new { role = "system", content = systemPrompt },
-        new { role = "user", content = $"Route this transaction: {JsonSerializer.Serialize(transaction)}" },
-        new { role = "assistant", content = JsonSerializer.Serialize(optimalDecision) }
-    }
+// Convert raw transaction data to ML features
+var features = new PspPerformanceFeatures
+{
+    Amount = (float)transaction.Amount,
+    PaymentMethodId = transaction.PaymentMethodId,
+    CurrencyId = transaction.CurrencyId,
+    RiskScore = transaction.RiskScore,
+    IsTokenized = transaction.IsTokenized ? 1.0f : 0.0f,
+    HourOfDay = transaction.DateCreated.Hour,
+    DayOfWeek = (float)transaction.DateCreated.DayOfWeek,
+    AmountLog = (float)Math.Log10(Math.Max((float)transaction.Amount, 1)),
+    IsSuccessful = transaction.IsSuccessful,
+    ProcessingTimeMs = transaction.ProcessingTimeMs
 };
 ```
 
-### **Quality Requirements**
-
-#### **Data Volume**
-- **Minimum**: 1,000 high-quality examples
-- **Recommended**: 10,000+ examples for robust performance
-- **Optimal**: 50,000+ examples covering diverse scenarios
-
-#### **Data Diversity**
-- **Payment Methods**: Card, PayPal, Klarna, etc.
-- **Currencies**: USD, EUR, GBP, etc.
-- **Amounts**: Low-value to high-value transactions
-- **Regions**: Different countries and regulatory environments
-- **Risk Levels**: Low-risk to high-risk transactions
-
-#### **Data Quality**
-- **Accuracy**: Only use successful routing decisions
-- **Consistency**: Standardized decision format and reasoning
-- **Completeness**: All required fields present and valid
-- **Freshness**: Recent data reflecting current PSP performance
 
 ### **Training Process**
 
-#### **1. Data Upload**
+#### **1. Load Training Data**
 ```csharp
-// Upload training data to OpenAI
-var fileId = await trainingService.UploadFileToOpenAI(trainingDataJsonl);
+// Load training data from database
+var trainingData = await GetTrainingDataFromDatabase();
 ```
 
-#### **2. Fine-Tuning Job Creation**
+#### **2. Create Training Pipeline**
 ```csharp
-// Create fine-tuning job
-var jobId = await trainingService.CreateFineTuningJobViaHttp(fileId);
+// Create ML.NET training pipeline
+var pipeline = _mlContext.Transforms.Concatenate("Features", featureColumns)
+    .Append(_mlContext.Transforms.NormalizeMinMax("Features"))
+    .Append(_mlContext.BinaryClassification.Trainers.LightGbm(...));
 ```
 
-#### **3. Training Monitoring**
+#### **3. Train and Evaluate**
 ```csharp
-// Monitor training progress
-var jobStatus = await trainingService.GetFineTuningJobDetails(jobId);
-// Status: "validating_files" → "queued" → "running" → "succeeded"
+// Train the model
+var trainedModel = pipeline.Fit(trainTestSplit.TrainSet);
+
+// Evaluate model performance
+var predictions = trainedModel.Transform(trainTestSplit.TestSet);
+var metrics = _mlContext.BinaryClassification.Evaluate(predictions);
 ```
 
-#### **4. Model Deployment**
+#### **4. Save Model**
 ```csharp
-// Use fine-tuned model
-var modelId = "ft:gpt-3.5-turbo:your-org:psp-router:abc123";
-var chatClient = new OpenAIChatClient(apiKey, model: modelId);
+// Save trained model to disk
+_mlContext.Model.Save(trainedModel, trainingData.Schema, modelPath);
 ```
 
 ### **Benefits of Training Data**
 
-1. **🎯 Domain Expertise**: Model learns payment routing patterns
+1. **🎯 Domain Expertise**: Models learn payment routing patterns
 2. **📊 Pattern Recognition**: Identifies successful routing strategies
 3. **🔧 Consistency**: Standardized decision-making process
 4. **🚀 Performance**: Optimized for payment routing scenarios
 5. **📈 Scalability**: Handles diverse transaction types
 
 ### **In Summary**
-Training data is the **foundation** that transforms a general-purpose LLM into a specialized payment routing expert. By learning from historical transaction outcomes, the fine-tuned model becomes capable of making intelligent routing decisions that optimize for authorization rates, fees, and compliance! 🎓✨
+Training data is the **foundation** that transforms ML.NET into a specialized payment routing expert. By learning from historical transaction outcomes, the ML models become capable of making intelligent routing decisions that optimize for authorization rates, fees, and compliance! 🎓✨
 
 ---
 
@@ -451,9 +574,17 @@ Training data is the **foundation** that transforms a general-purpose LLM into a
 
 This document has covered the key AI/ML concepts used in the PSP Router:
 
-1. **🧠 ML-Based**: The AI brain that makes intelligent routing decisions using learned patterns
-2. **🧠 ML-Based's Role**: Detailed explanation of how the model serves as the intelligent decision engine
-3. **⚙️ ML-Based Approach**: Comprehensive guide to the fine-tuning methodology
-4. **🎓 Training Data**: The foundation that teaches the model payment routing expertise
+1. **🧠 ML.NET**: The machine learning framework that powers our system
+2. **🎯 Four-Model Architecture**: Specialized models for different prediction tasks
+3. **🌳 LightGBM**: The gradient boosting algorithm for all our models
+4. **🔧 Feature Engineering**: Transforming raw data into ML features
+5. **🔄 Real-time Learning**: Continuous model improvement with feedback
+6. **🧠 ML-Based Routing**: How ML models make intelligent routing decisions
 
-These concepts work together to create an intelligent payment routing system that uses pre-trained patterns from historical transaction data to make optimal routing decisions! 🚀
+These concepts work together to create an intelligent payment routing system that uses ML.NET and LightGBM to make optimal routing decisions based on learned patterns from historical transaction data! 🚀
+
+---
+
+**Last Updated:** December 2024  
+**Status:** ✅ ML.NET-based system implemented and working  
+**Architecture:** Four specialized LightGBM models with real-time learning
