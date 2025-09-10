@@ -1,4 +1,4 @@
-# 🚀 PSP Router - ML-Based Implementation TODO List
+# 🚀 PSP Router - TODO List (ML-Based variant)
 
 ## 📋 Current Status Overview
 **Status:** ✅ **Core ML System Implemented & Working**  
