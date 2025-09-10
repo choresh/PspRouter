@@ -53,22 +53,30 @@ public class PspCandidateProvider : IPspCandidateProvider
                     var processingTime = await _performancePredictor.PredictProcessingTime(candidate.Name, transaction, cancellationToken);
                     var mlHealth = await _performancePredictor.PredictHealthStatus(candidate.Name, cancellationToken);
 
-                    // Use ML predictions if they're better than historical data
-                    var finalAuthRate = Math.Max(successRate, candidate.CurrentAuthRate);
+                    if (mlHealth != "red")
+                    {
+                        // Use ML predictions if they're better than historical data
+                        var finalAuthRate = Math.Max(successRate, candidate.CurrentAuthRate);
 
-                    enhancedCandidates.Add(new PspSnapshot(
-                        candidate.Name,
-                        candidate.Supports,
-                        mlHealth, // Use ML-based health
-                        finalAuthRate, // Use ML-enhanced auth rate
-                        candidate.FeeBps,
-                        candidate.FixedFee,
-                        candidate.Supports3DS,
-                        candidate.Tokenization
-                    ));
+                        enhancedCandidates.Add(new PspSnapshot(
+                            candidate.Name,
+                            candidate.Supports,
+                            mlHealth, // Use ML-based health
+                            finalAuthRate, // Use ML-enhanced auth rate
+                            candidate.FeeBps,
+                            candidate.FixedFee,
+                            candidate.Supports3DS,
+                            candidate.Tokenization
+                        ));
 
-                    _logger.LogDebug("Enhanced PSP {PspName} with ML predictions: Success={SuccessRate:P2}, Health={Health}",
-                        candidate.Name, successRate, mlHealth);
+                        _logger.LogDebug("Enhanced PSP {PspName} with ML predictions: Success={SuccessRate:P2}, Health={Health}",
+                            candidate.Name, successRate, mlHealth);
+                    }
+                    else
+                    {
+                        // TODO: ???
+                    }
+
                 }
                 catch (Exception ex)
                 {
