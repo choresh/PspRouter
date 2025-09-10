@@ -45,22 +45,20 @@ public record RouteDecision(
 
 public sealed class RoutingSettings
 {
-    public ScoringWeights Weights { get; init; } = new();
-    public string[] AllowedHealthStatuses { get; init; } = new[] { "green", "yellow" };
-
-    public static RoutingSettings Default => new();
+    public ScoringWeights? Weights { get; init; }
+    public string[]? AllowedHealthStatuses { get; init; }
 }
 
 public sealed class ScoringWeights
 {
-    public double AuthWeight { get; init; } = 1.0;
-    public double FeeBpsWeight { get; init; } = 1.0;
-    public double FixedFeeWeight { get; init; } = 1.0;
-    public double Supports3DSBonusWhenSCARequired { get; init; } = 0.0;
-    public double RiskScorePenaltyPerPoint { get; init; } = 0.0; // 0..1 per risk point (0-100)
-    public double HealthYellowPenalty { get; init; } = 0.0;
-    public double BusinessBiasWeight { get; init; } = 0.0;
-    public Dictionary<string, double> BusinessBias { get; init; } = new();
+    public double AuthWeight { get; init; }
+    public double FeeBpsWeight { get; init; }
+    public double FixedFeeWeight { get; init; }
+    public double Supports3DSBonusWhenSCARequired { get; init; }
+    public double RiskScorePenaltyPerPoint { get; init; }// 0..1 per risk point (0-100)
+    public double HealthYellowPenalty { get; init; }
+    public double BusinessBiasWeight { get; init; }
+    public Dictionary<string, double> BusinessBias { get; init; }
 
 }
 

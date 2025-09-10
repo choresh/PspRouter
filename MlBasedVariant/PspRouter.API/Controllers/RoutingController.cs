@@ -185,11 +185,5 @@ public class RouteRequest
     /// <summary>
     /// Transaction details
     /// </summary>
-    public RouteInput Transaction { get; set; } = null!;
-
-    /// <summary>
-    /// Available PSP candidates
-    /// </summary>
-    public List<PspSnapshot> Candidates { get; set; } = new();
-
+    public required RouteInput Transaction { get; set; }
 }

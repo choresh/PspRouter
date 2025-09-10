@@ -30,7 +30,7 @@ public class PspCandidateProvider : IPspCandidateProvider
         List<PspCandidate> baseCandidates;
         lock (_lock)
         {
-            var allowedHealth = new[] { "green", "yellow" };
+            var allowedHealth = new[] { "green", "yellow" }; // Only allow green and yellow PSPs
 
             baseCandidates = _candidates.Values
                 .Where(c => c.Supports)
@@ -226,10 +226,10 @@ public class PspCandidateProvider : IPspCandidateProvider
                         SUM(CASE WHEN PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END) as SuccessfulTransactions,
                         AVG(CASE WHEN PaymentTransactionStatusId IN (5, 7, 9) THEN 1.0 ELSE 0.0 END) as AuthRate30d,
                         AVG(CASE 
-                            WHEN DateStatusLastUpdated IS NULL OR DateCreated IS NULL THEN 0
-                            WHEN DateStatusLastUpdated < DateCreated THEN 0
-                            WHEN DATEDIFF(DAY, DateCreated, DateStatusLastUpdated) > 30 THEN 0
-                            WHEN DATEDIFF(DAY, DateCreated, DateStatusLastUpdated) < 0 THEN 0
+                            WHEN DateStatusLastUpdated IS NULL OR DateCreated IS NULL THEN 2000  -- Default 2 seconds
+                            WHEN DateStatusLastUpdated < DateCreated THEN 2000  -- Default 2 seconds
+                            WHEN DATEDIFF(DAY, DateCreated, DateStatusLastUpdated) > 1 THEN 2000  -- Default 2 seconds for old transactions
+                            WHEN DATEDIFF(DAY, DateCreated, DateStatusLastUpdated) < 0 THEN 2000  -- Default 2 seconds
                             ELSE CAST(DATEDIFF(MINUTE, DateCreated, DateStatusLastUpdated) AS BIGINT) * 60000
                         END) as AvgProcessingTime,
                         MAX(CASE WHEN IsTokenized = 1 THEN 1 ELSE 0 END) as SupportsTokenization,
@@ -250,9 +250,10 @@ public class PspCandidateProvider : IPspCandidateProvider
                     SupportsTokenization,
                     Supports3DS,
                     CASE 
-                        WHEN AuthRate30d >= 0.9 AND AvgProcessingTime <= 2000 THEN 'green'
-                        WHEN AuthRate30d >= 0.8 AND AvgProcessingTime <= 3000 THEN 'yellow'
-                        ELSE 'red'
+                        WHEN AuthRate30d >= 0.95 THEN 'green'  -- High success rate = green
+                        WHEN AuthRate30d >= 0.85 THEN 'yellow'  -- Good success rate = yellow
+                        WHEN AuthRate30d >= 0.70 THEN 'yellow'  -- Acceptable success rate = yellow
+                        ELSE 'red'  -- Low success rate = red
                     END as HealthStatus
                 FROM PspStats
                 ORDER BY AuthRate30d DESC";

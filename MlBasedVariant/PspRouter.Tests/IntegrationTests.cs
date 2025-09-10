@@ -49,9 +49,30 @@ public class IntegrationTests
         
         // Create prediction service (mock for now)
         var predictionService = new MockPredictionService();
-        
+
+        var routingSettings = new RoutingSettings
+        {
+            Weights = new()
+            {
+                AuthWeight = 1.0,
+                FeeBpsWeight = 1.0,
+                FixedFeeWeight = 1.0,
+                Supports3DSBonusWhenSCARequired = 0.0,
+                RiskScorePenaltyPerPoint = 0.0, // 0..1 per risk point (0-100)
+                HealthYellowPenalty = 0.0,
+                BusinessBiasWeight = 0.0,
+                BusinessBias = new(){
+                    { "Adyen", 0.0 },
+                    { "Stripe", 0.0 },
+                    { "Klarna", 0.0 },
+                    { "PayPal", 0.0 }
+                }
+            },
+             AllowedHealthStatuses = ["green", "yellow"]
+         };
+         
         // Create router
-        var router = new Router(predictionService, candidateProvider, loggerFactory.CreateLogger<Router>());
+        var router = new Router(predictionService, candidateProvider, loggerFactory.CreateLogger<Router>(), routingSettings);
         
         logger.LogInformation("🚀 Starting ML-Enhanced PSP Routing Integration Test");
         

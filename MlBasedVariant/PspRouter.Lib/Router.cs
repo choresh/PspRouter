@@ -15,13 +15,13 @@ public sealed class Router
     public Router(
         IPredictionService predictionService,
         IPspCandidateProvider candidateProvider,
-        ILogger<Router>? logger = null, 
-        RoutingSettings? settings = null)
+        ILogger<Router> logger, 
+        RoutingSettings settings)
     {
         _predictionService = predictionService;
         _candidateProvider = candidateProvider;
         _logger = logger;
-        _settings = settings ?? RoutingSettings.Default;
+        _settings = settings;
     }
 
     public async Task<RouteDecision> Decide(RouteInput transaction, CancellationToken ct)
@@ -60,9 +60,11 @@ public sealed class Router
         return ScoreDeterministically(transaction, candidates.ToList());
     }
 
-    private static RouteDecision Fail(string guardrail, string why) =>
-        new("1.0", Guid.NewGuid().ToString(), "NONE", Array.Empty<string>(), why, guardrail,
+    private static RouteDecision Fail(string guardrail, string why)
+    {
+        return new("1.0", Guid.NewGuid().ToString(), "NONE", Array.Empty<string>(), why, guardrail,
             new RouteConstraints(false, 0, 0), Array.Empty<string>());
+    }
 
     private async Task<RouteDecision?> DecideWithML(RouteContext ctx, List<PspSnapshot> validCandidates, CancellationToken ct)
     {
