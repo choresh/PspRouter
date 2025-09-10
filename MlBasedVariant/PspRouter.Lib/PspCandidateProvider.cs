@@ -31,7 +31,7 @@ public class PspCandidateProvider : IPspCandidateProvider
         lock (_lock)
         {
             var allowedHealth = new[] { "green", "yellow" };
-            
+
             baseCandidates = _candidates.Values
                 .Where(c => c.Supports)
                 .Where(c => allowedHealth.Contains(c.Health, StringComparer.OrdinalIgnoreCase))
@@ -43,7 +43,7 @@ public class PspCandidateProvider : IPspCandidateProvider
         if (_performancePredictor != null)
         {
             var enhancedCandidates = new List<PspSnapshot>();
-            
+
             foreach (var candidate in baseCandidates)
             {
                 try
@@ -52,10 +52,10 @@ public class PspCandidateProvider : IPspCandidateProvider
                     var successRate = await _performancePredictor.PredictSuccessRate(candidate.Name, transaction, cancellationToken);
                     var processingTime = await _performancePredictor.PredictProcessingTime(candidate.Name, transaction, cancellationToken);
                     var mlHealth = await _performancePredictor.PredictHealthStatus(candidate.Name, cancellationToken);
-                    
+
                     // Use ML predictions if they're better than historical data
                     var finalAuthRate = Math.Max(successRate, candidate.CurrentAuthRate);
-                    
+
                     enhancedCandidates.Add(new PspSnapshot(
                         candidate.Name,
                         candidate.Supports,
@@ -66,14 +66,14 @@ public class PspCandidateProvider : IPspCandidateProvider
                         candidate.Supports3DS,
                         candidate.Tokenization
                     ));
-                    
-                    _logger.LogDebug("Enhanced PSP {PspName} with ML predictions: Success={SuccessRate:P2}, Health={Health}", 
+
+                    _logger.LogDebug("Enhanced PSP {PspName} with ML predictions: Success={SuccessRate:P2}, Health={Health}",
                         candidate.Name, successRate, mlHealth);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to get ML predictions for PSP {PspName}, using historical data", candidate.Name);
-                    
+
                     // Fallback to historical data
                     enhancedCandidates.Add(new PspSnapshot(
                         candidate.Name,
@@ -87,27 +87,27 @@ public class PspCandidateProvider : IPspCandidateProvider
                     ));
                 }
             }
-            
-            _logger.LogInformation("Retrieved {Count} ML-enhanced PSP candidates for transaction {MerchantId}", 
+
+            _logger.LogInformation("Retrieved {Count} ML-enhanced PSP candidates for transaction {MerchantId}",
                 enhancedCandidates.Count, transaction.MerchantId);
-            
+
             return enhancedCandidates;
         }
         else
         {
             // No ML predictor available, use historical data
             var candidates = baseCandidates.Select(c => new PspSnapshot(
-                c.Name,
-                c.Supports,
-                c.Health,
+                    c.Name,
+                    c.Supports,
+                    c.Health,
                 c.CurrentAuthRate,
-                c.FeeBps,
-                c.FixedFee,
-                c.Supports3DS,
-                c.Tokenization
+                    c.FeeBps,
+                    c.FixedFee,
+                    c.Supports3DS,
+                    c.Tokenization
             )).ToList();
 
-            _logger.LogInformation("Retrieved {Count} PSP candidates (historical data only) for transaction {MerchantId}", 
+            _logger.LogInformation("Retrieved {Count} PSP candidates (historical data only) for transaction {MerchantId}",
                 candidates.Count, transaction.MerchantId);
 
             return candidates;
@@ -130,7 +130,7 @@ public class PspCandidateProvider : IPspCandidateProvider
 
                 _candidates[feedback.PspName] = updatedCandidate;
 
-                _logger.LogInformation("Updated PSP {PspName} performance: {SuccessRate:P2} auth rate, {AvgTime}ms avg processing time", 
+                _logger.LogInformation("Updated PSP {PspName} performance: {SuccessRate:P2} auth rate, {AvgTime}ms avg processing time",
                     feedback.PspName, updatedCandidate.CurrentAuthRate, updatedCandidate.AverageProcessingTime);
             }
             else
@@ -146,7 +146,7 @@ public class PspCandidateProvider : IPspCandidateProvider
             {
                 await _performancePredictor.UpdateWithFeedback(feedback, cancellationToken);
                 _logger.LogDebug("Updated ML models with feedback for PSP {PspName}", feedback.PspName);
-                
+
                 // 3. Check if models need retraining and do it asynchronously
                 if (_retrainingService != null && _retrainingService.ShouldRetrainModels())
                 {
@@ -207,15 +207,15 @@ public class PspCandidateProvider : IPspCandidateProvider
     private Dictionary<string, PspCandidate> LoadCandidatesFromDatabase()
     {
         _logger.LogInformation("Loading PSP candidates from database");
-        
+
         try
         {
             var connectionString = GetConnectionString();
             var candidates = new Dictionary<string, PspCandidate>();
-            
+
             using var connection = new SqlConnection(connectionString);
             connection.Open();
-            
+
             // Query to derive PSP information from PaymentTransactions table
             var query = @"
                 WITH PspStats AS (
@@ -256,12 +256,12 @@ public class PspCandidateProvider : IPspCandidateProvider
                     END as HealthStatus
                 FROM PspStats
                 ORDER BY AuthRate30d DESC";
-            
+
             using var command = new SqlCommand(query, connection);
             command.CommandTimeout = _settings.QueryTimeoutSeconds;
-            
+
             using var reader = command.ExecuteReader();
-            
+
             while (reader.Read())
             {
                 var pspId = reader.GetInt64(0).ToString();
@@ -273,11 +273,11 @@ public class PspCandidateProvider : IPspCandidateProvider
                 var supportsTokenization = reader.GetInt32(6) == 1;
                 var supports3DS = reader.GetInt32(7) == 1;
                 var healthStatus = reader.GetString(8);
-                
+
                 // Calculate default fees based on PSP performance (simplified)
                 var feeBps = authRate >= 0.9 ? 25 : authRate >= 0.8 ? 30 : 35;
                 var fixedFee = authRate >= 0.9 ? 0.30m : authRate >= 0.8 ? 0.25m : 0.20m;
-                
+
                 var candidate = new PspCandidate(
                     Name: name,
                     Supports: true, // All PSPs in the query are considered active
@@ -290,10 +290,10 @@ public class PspCandidateProvider : IPspCandidateProvider
                     PerformanceByCountry: new Dictionary<string, double>(),
                     PerformanceByPaymentMethod: new Dictionary<string, double>()
                 );
-                
+
                 candidates[name] = candidate;
             }
-            
+
             _logger.LogInformation("Successfully loaded {Count} PSP candidates from PaymentTransactions data", candidates.Count);
             return candidates;
         }
@@ -303,19 +303,19 @@ public class PspCandidateProvider : IPspCandidateProvider
             throw;
         }
     }
-    
+
     private string GetConnectionString()
     {
         // Get .env file variable
-        var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION") 
+        var baseConnectionString = Environment.GetEnvironmentVariable("PSPROUTER_DB_CONNECTION")
             ?? throw new InvalidOperationException("PSPROUTER_DB_CONNECTION environment variable is required");
-        
+
         // Ensure TrustServerCertificate=true is included to handle SSL certificate issues
         if (_settings.TrustServerCertificate && !baseConnectionString.Contains("TrustServerCertificate", StringComparison.OrdinalIgnoreCase))
         {
             return baseConnectionString.TrimEnd(';') + ";TrustServerCertificate=true;";
         }
-        
+
         return baseConnectionString;
     }
 
