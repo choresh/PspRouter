@@ -1,0 +1,541 @@
+{
+	"info": {
+		"_postman_id": "psp-router-routing",
+		"name": "Routing Flow",
+		"description": "PSP routing system demonstration with realistic routing calls and feedback loops",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"health"
+					]
+				},
+				"description": "Check if the PSP Router API is running and healthy"
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get Available PSPs",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/routing/psps",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"psps"
+					]
+				},
+				"description": "Get all available PSP candidates with their current performance metrics"
+			},
+			"response": []
+		},
+		{
+			"name": "3. Route Transaction - Standard Card Payment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"merchantId\": \"MERCHANT_001\",\n  \"buyerCountry\": \"US\",\n  \"merchantCountry\": \"US\",\n  \"currencyId\": 840,\n  \"amount\": 99.99,\n  \"paymentMethodId\": 1,\n  \"paymentCardBin\": \"411111\",\n  \"threeDSTypeId\": 1,\n  \"isTokenized\": false,\n  \"scaRequired\": false,\n  \"riskScore\": 25\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/decide",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"decide"
+					]
+				},
+				"description": "Route a standard card payment transaction - low risk, no SCA required"
+			},
+			"response": []
+		},
+		{
+			"name": "4. Process Feedback - Successful Transaction",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"decisionId\": \"{{decision_id_1}}\",\n  \"merchantId\": \"MERCHANT_001\",\n  \"pspName\": \"{{selected_psp_1}}\",\n  \"authorized\": true,\n  \"transactionAmount\": 99.99,\n  \"feeAmount\": 2.50,\n  \"processingTimeMs\": 1200,\n  \"riskScore\": 25,\n  \"processedAt\": \"{{$isoTimestamp}}\",\n  \"routingMethod\": \"ml\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/feedback",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"feedback"
+					]
+				},
+				"description": "Process feedback for the successful standard card payment transaction"
+			},
+			"response": []
+		},
+		{
+			"name": "5. Route Transaction - High-Risk Payment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"merchantId\": \"MERCHANT_002\",\n  \"buyerCountry\": \"BR\",\n  \"merchantCountry\": \"US\",\n  \"currencyId\": 840,\n  \"amount\": 2500.00,\n  \"paymentMethodId\": 1,\n  \"paymentCardBin\": \"555555\",\n  \"threeDSTypeId\": 2,\n  \"isTokenized\": false,\n  \"scaRequired\": true,\n  \"riskScore\": 85\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/decide",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"decide"
+					]
+				},
+				"description": "Route a high-risk payment transaction - requires SCA, high amount, international"
+			},
+			"response": []
+		},
+		{
+			"name": "6. Process Feedback - Failed Transaction",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"decisionId\": \"{{decision_id_2}}\",\n  \"merchantId\": \"MERCHANT_002\",\n  \"pspName\": \"{{selected_psp_2}}\",\n  \"authorized\": false,\n  \"transactionAmount\": 2500.00,\n  \"feeAmount\": 0.00,\n  \"processingTimeMs\": 3500,\n  \"riskScore\": 85,\n  \"processedAt\": \"{{$isoTimestamp}}\",\n  \"errorCode\": \"INSUFFICIENT_FUNDS\",\n  \"errorMessage\": \"Transaction declined due to insufficient funds\",\n  \"routingMethod\": \"ml\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/feedback",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"feedback"
+					]
+				},
+				"description": "Process feedback for the failed high-risk payment transaction"
+			},
+			"response": []
+		},
+		{
+			"name": "7. Route Transaction - Tokenized Payment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"merchantId\": \"MERCHANT_003\",\n  \"buyerCountry\": \"GB\",\n  \"merchantCountry\": \"GB\",\n  \"currencyId\": 826,\n  \"amount\": 45.50,\n  \"paymentMethodId\": 1,\n  \"paymentCardBin\": \"424242\",\n  \"threeDSTypeId\": 1,\n  \"isTokenized\": true,\n  \"scaRequired\": false,\n  \"riskScore\": 15\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/decide",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"decide"
+					]
+				},
+				"description": "Route a tokenized payment transaction - low risk, tokenized card, UK domestic"
+			},
+			"response": []
+		},
+		{
+			"name": "8. Process Feedback - Successful Tokenized Transaction",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"decisionId\": \"{{decision_id_3}}\",\n  \"merchantId\": \"MERCHANT_003\",\n  \"pspName\": \"{{selected_psp_3}}\",\n  \"authorized\": true,\n  \"transactionAmount\": 45.50,\n  \"feeAmount\": 1.20,\n  \"processingTimeMs\": 800,\n  \"riskScore\": 15,\n  \"processedAt\": \"{{$isoTimestamp}}\",\n  \"routingMethod\": \"ml\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/feedback",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"feedback"
+					]
+				},
+				"description": "Process feedback for the successful tokenized payment transaction"
+			},
+			"response": []
+		},
+		{
+			"name": "9. Route Transaction - Alternative Payment Method",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"merchantId\": \"MERCHANT_004\",\n  \"buyerCountry\": \"DE\",\n  \"merchantCountry\": \"DE\",\n  \"currencyId\": 978,\n  \"amount\": 150.00,\n  \"paymentMethodId\": 3,\n  \"threeDSTypeId\": null,\n  \"isTokenized\": false,\n  \"scaRequired\": false,\n  \"riskScore\": 30\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/decide",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"decide"
+					]
+				},
+				"description": "Route an alternative payment method transaction - Klarna, German market"
+			},
+			"response": []
+		},
+		{
+			"name": "10. Process Feedback - Successful Alternative Payment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"decisionId\": \"{{decision_id_4}}\",\n  \"merchantId\": \"MERCHANT_004\",\n  \"pspName\": \"{{selected_psp_4}}\",\n  \"authorized\": true,\n  \"transactionAmount\": 150.00,\n  \"feeAmount\": 4.50,\n  \"processingTimeMs\": 1800,\n  \"riskScore\": 30,\n  \"processedAt\": \"{{$isoTimestamp}}\",\n  \"routingMethod\": \"ml\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/feedback",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"feedback"
+					]
+				},
+				"description": "Process feedback for the successful alternative payment method transaction"
+			},
+			"response": []
+		},
+		{
+			"name": "11. Route Transaction - Cross-Border High Value",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"merchantId\": \"MERCHANT_005\",\n  \"buyerCountry\": \"JP\",\n  \"merchantCountry\": \"US\",\n  \"currencyId\": 840,\n  \"amount\": 5000.00,\n  \"paymentMethodId\": 1,\n  \"paymentCardBin\": \"400000\",\n  \"threeDSTypeId\": 3,\n  \"isTokenized\": false,\n  \"scaRequired\": true,\n  \"riskScore\": 75\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/decide",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"decide"
+					]
+				},
+				"description": "Route a cross-border high-value transaction - Japan to US, high amount, requires SCA"
+			},
+			"response": []
+		},
+		{
+			"name": "12. Process Feedback - Successful Cross-Border Transaction",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"decisionId\": \"{{decision_id_5}}\",\n  \"merchantId\": \"MERCHANT_005\",\n  \"pspName\": \"{{selected_psp_5}}\",\n  \"authorized\": true,\n  \"transactionAmount\": 5000.00,\n  \"feeAmount\": 125.00,\n  \"processingTimeMs\": 2800,\n  \"riskScore\": 75,\n  \"processedAt\": \"{{$isoTimestamp}}\",\n  \"routingMethod\": \"ml\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/feedback",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"feedback"
+					]
+				},
+				"description": "Process feedback for the successful cross-border high-value transaction"
+			},
+			"response": []
+		},
+		{
+			"name": "13. Check ML Model Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/routing/ml/status",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"ml",
+						"status"
+					]
+				},
+				"description": "Check the status of ML models and retraining service"
+			},
+			"response": []
+		},
+		{
+			"name": "14. Trigger ML Model Retraining",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"pspName\": \"{{selected_psp_1}}\",\n  \"forceRetrain\": false\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/ml/retrain",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"ml",
+						"retrain"
+					]
+				},
+				"description": "Trigger ML model retraining for a specific PSP based on recent feedback data"
+			},
+			"response": []
+		},
+		{
+			"name": "15. Get Routing Analytics",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/routing/analytics?from={{$timestamp}}&to={{$timestamp}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"analytics"
+					],
+					"query": [
+						{
+							"key": "from",
+							"value": "{{$timestamp}}"
+						},
+						{
+							"key": "to",
+							"value": "{{$timestamp}}"
+						}
+					]
+				},
+				"description": "Get routing analytics and performance metrics for the test period"
+			},
+			"response": []
+		},
+		{
+			"name": "16. Route Transaction - Final Test (ML Learning)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"merchantId\": \"MERCHANT_006\",\n  \"buyerCountry\": \"CA\",\n  \"merchantCountry\": \"US\",\n  \"currencyId\": 840,\n  \"amount\": 75.25,\n  \"paymentMethodId\": 1,\n  \"paymentCardBin\": \"555555\",\n  \"threeDSTypeId\": 1,\n  \"isTokenized\": false,\n  \"scaRequired\": false,\n  \"riskScore\": 40\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/decide",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"decide"
+					]
+				},
+				"description": "Final routing test to demonstrate ML model learning from previous feedback"
+			},
+			"response": []
+		},
+		{
+			"name": "17. Process Final Feedback - Demonstrate Learning",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"decisionId\": \"{{decision_id_6}}\",\n  \"merchantId\": \"MERCHANT_006\",\n  \"pspName\": \"{{selected_psp_6}}\",\n  \"authorized\": true,\n  \"transactionAmount\": 75.25,\n  \"feeAmount\": 1.88,\n  \"processingTimeMs\": 950,\n  \"riskScore\": 40,\n  \"processedAt\": \"{{$isoTimestamp}}\",\n  \"routingMethod\": \"ml\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/routing/feedback",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"feedback"
+					]
+				},
+				"description": "Process final feedback to demonstrate how ML models learn and improve over time"
+			},
+			"response": []
+		},
+		{
+			"name": "18. Get Final System Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/routing/status",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"routing",
+						"status"
+					]
+				},
+				"description": "Get final system status showing all PSPs, their performance metrics, and ML model states"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set dynamic timestamps",
+					"pm.globals.set('current_timestamp', new Date().toISOString());",
+					"pm.globals.set('current_date', new Date().toISOString().split('T')[0]);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Extract decision IDs and PSP names from routing responses",
+					"if (pm.response.code === 200) {",
+					"    try {",
+					"        const responseJson = pm.response.json();",
+					"        ",
+					"        // Extract decision ID for feedback",
+					"        if (responseJson.decisionId) {",
+					"            const requestName = pm.info.name;",
+					"            if (requestName.includes('Route Transaction')) {",
+					"                const decisionNumber = requestName.match(/\\d+/)[0];",
+					"                pm.globals.set(`decision_id_${decisionNumber}`, responseJson.decisionId);",
+					"                pm.globals.set(`selected_psp_${decisionNumber}`, responseJson.selectedPsp);",
+					"            }",
+					"        }",
+					"        ",
+					"        // Log routing decisions",
+					"        if (responseJson.selectedPsp) {",
+					"            console.log(`Routing Decision: ${responseJson.selectedPsp} (Confidence: ${responseJson.confidence || 'N/A'})`);",
+					"        }",
+					"        ",
+					"        // Log feedback processing",
+					"        if (responseJson.success !== undefined) {",
+					"            console.log(`Feedback Processed: ${responseJson.success ? 'Success' : 'Failed'}`);",
+					"        }",
+					"    } catch (e) {",
+					"        console.log('Response parsing error:', e.message);",
+					"    }",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://localhost:7001",
+			"type": "string"
+		},
+		{
+			"key": "api_version",
+			"value": "v1",
+			"type": "string"
+		}
+	]
+}

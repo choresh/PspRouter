@@ -118,11 +118,11 @@ builder.Services.AddSingleton<IPspPerformancePredictor>(provider =>
 // === Register PSP Candidate Provider ===
 builder.Services.AddSingleton<IPspCandidateProvider>(provider =>
 {
-    var logger = provider.GetRequiredService<ILogger<MLEnhancedPspCandidateProvider>>();
+    var logger = provider.GetRequiredService<ILogger<PspCandidateProvider>>();
     var pspCandidateSettings = new PspCandidateSettings();
     builder.Configuration.GetSection("PspRouter:PspCandidates").Bind(pspCandidateSettings);
     var performancePredictor = provider.GetRequiredService<IPspPerformancePredictor>();
-    return new MLEnhancedPspCandidateProvider(logger, pspCandidateSettings, performancePredictor);
+    return new PspCandidateProvider(logger, pspCandidateSettings, performancePredictor);
 });
 
 // === Register ML Router ===

@@ -1,5 +1,3 @@
-using Microsoft.ML.Data;
-
 namespace PspRouter.Lib;
 
 /// <summary>
