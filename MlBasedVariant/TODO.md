@@ -1,286 +1,256 @@
-# 🚀 PSP Router - Implementation TODO List (ML-Based Variant)
+# 🚀 PSP Router - ML-Based Implementation TODO List
 
-## 📋 Overview
-This document outlines all the components that need to be implemented to complete the PSP Router solution. The system uses a **fine-tuned model approach** where the AI learns everything from historical transaction data.
-
----
-
-## 📅 **Implementation Timeline & Next Stages**
-
-### **📋 Implementation Priority Order**
-1. Environment configuration: OpenAI API key, fine-tuned model setup
-2. Training data preparation: collect and format historical transaction data
-3. Fine-tuning workflow: upload data, create job, monitor training
-4. Observability: logging, metrics, tracing; robust error handling
-5. Testing: integration and performance (latency + fallback)
-6. Deployment: containerization, CI/CD, config management
-7. Hardening: security, rate limiting, caching
-8. Client SDK: sender-side library to build candidates and call API
-
-### **⚠️ Critical Dependencies**
-- Environment configuration before training
-- Historical transaction data before fine-tuning
-- Observability before production rollout
-- Database connectivity for Client SDK
-
-### **🔄 Sequential vs Parallel Tasks**
-**Sequential:** Environment setup → Training data → Fine-tuning → Observability → Testing → Deployment
-
-**Parallel:** Monitoring/Rate limiting/Caching once endpoints stable
-
-### **🎯 Success Criteria**
-- P95 latency within SLA with deterministic fallback
-- Schema-valid decisions with clear reasoning
-- Production-grade logs/metrics/traces
+## 📋 Current Status Overview
+**Status:** ✅ **Core ML System Implemented & Working**  
+**Last Updated:** December 2024  
+**Architecture:** ML.NET-based PSP routing with real-time learning and feedback loops
 
 ---
 
-## 🚀 **Phase 1: Core Functionality**
+## 🎯 **System Architecture Status**
 
-### 1. **Environment Configuration** ⚠️ **REQUIRED**
+### ✅ **COMPLETED - Core ML System**
+- [x] **ML.NET Integration**: Three ML models (Success Rate, Processing Time, Health Status)
+- [x] **Real-time Learning**: Dynamic model creation and feedback processing
+- [x] **Database Integration**: PaymentTransactions data for training and retraining
+- [x] **Health Status Management**: Green/Yellow/Red PSP classification
+- [x] **Integration Tests**: Complete routing flow with feedback loops
+- [x] **Client SDK**: PspRouter.Client with database integration
+- [x] **Model Retraining Service**: Automated ML model retraining from database
+- [x] **Performance Predictor**: Real-time PSP performance predictions
+
+### ⚠️ **PARTIALLY IMPLEMENTED**
+- [x] **Basic Logging**: Console logging implemented
+- [ ] **Structured Logging**: Correlation IDs, structured log format
+- [ ] **Production Logging**: Different log levels for production vs development
+
+---
+
+## 🔧 **Code-Level TODO Items**
+
+### **PspRouter.Lib/MLModelRetrainingService.cs**
+```csharp
+// Line 434: TODO: Fix this
+/* TODO: Fix this - Unreachable code detected warning */
+```
+
+### **PspRouter.Lib/PspCandidateProvider.cs**
+```csharp
+// Line 325: TODO: Implement this
+// TODO: Implement this - Method needs implementation
+```
+
+### **PspRouter.Lib/PredictionService.cs**
+```csharp
+// Line 174: TODO: Implement proper country lookup service
+// Line 195: TODO: Implement proper PSP lookup service
+```
+
+### **PspRouter.Trainer/PspPerformanceDataProvider.cs**
+```csharp
+// Line 110: TODO: Add risk score calculation
+RiskScore = 0, // TODO: Add risk score calculation
+```
+
+---
+
+## 🚀 **Phase 1: Production Readiness (HIGH PRIORITY)**
+
+### 1. **Fix Code-Level TODOs** 🚨 **CRITICAL**
+- [ ] **Fix unreachable code** in `MLModelRetrainingService.cs` line 434
+- [ ] **Implement missing method** in `PspCandidateProvider.cs` line 325
+- [ ] **Add country lookup service** in `PredictionService.cs` line 174
+- [ ] **Add PSP lookup service** in `PredictionService.cs` line 195
+- [ ] **Implement risk score calculation** in `PspPerformanceDataProvider.cs` line 110
+
+### 2. **Environment Configuration** ⚠️ **REQUIRED**
 - [ ] Set database connection string `PSPROUTER_DB_CONNECTION` in `.env`
+- [ ] Configure model storage path in `appsettings.json`
+- [ ] Set up logging configuration for production
+- [ ] Configure ML model retraining intervals
 
-#### ML-Based Setup
-   - [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
-   - Optional: adjust sampling via `Trainer:Sampling` in `PspRouter.Trainer/appsettings.json` (e.g., TargetSampleSize, DateWindowMonths, MaxPerSegment)
-   - Run `dotnet run --project PspRouter.Trainer` to execute the workflow
-   - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.API\.env`)
-
-#### Product-Tunable Weights (Routing)
-- [ ] Configure `PspRouter:Routing:Weights` in `PspRouter.API/appsettings.json`
-- [ ] Configure `AllowedHealthStatuses` in `PspRouter.API/appsettings.json`
-
-
-#### Fine-tuning workflow (REQUIRED for production)
-- [ ] Use the trainer app (`PspRouter.Trainer`) for all training operations
-   - Adjust sampling via `Trainer:Sampling` in `PspRouter.Trainer/appsettings.json` (e.g., TargetSampleSize, DateWindowMonths, MaxPerSegment)
-   - `Trainer:Sampling:TargetSampleSize` should be thousands to hundreds of thousands of rows
-   - Optional: change the SQL query (within `GetTrainingData`), to achive better diverse sample for training, covering successes and failures, multiple currencies, payment methods, regions, 3DS vs non-3DS, tokenized vs non-tokenized, and a wide risk-score distribution.
-   - Run `dotnet run --project PspRouter.Trainer` to execute the workflow
-   - Set the resulted model ID at env variable OPENAI_FT_MODEL (at file `FineTunedModelVariant\PspRouter.API\.env`)
+### 3. **Production Logging & Monitoring** ⚠️ **HIGH**
+- [ ] **Structured Logging**: Add correlation IDs for request tracking
+- [ ] **Log Levels**: Configure different levels for production vs development
+- [ ] **Metrics Collection**: Authorization rates, response times, model performance
+- [ ] **Health Checks**: Add health check endpoints for routing service
+- [ ] **Alerting**: Set up alerts for model failures and routing errors
 
 ---
 
-## 🏗️ **Phase 2: Production Features**
-### 1. **Client SDK (PspRouter.Client)** ✅ **ADDED**
-- [x] Create `PspRouter.Client` project
-- [x] Implement `IPspDataProvider` with SQL Server queries from `PaymentTransactions`
-- [x] Implement `PspRouterClient` to build candidates and call API
-- [x] Add examples and README for sender integration
-- [ ] Package as NuGet and publish (optional)
+## 🏗️ **Phase 2: Advanced ML Features**
 
+### 1. **ML Model Enhancements** ⚠️ **MEDIUM**
+- [ ] **Model Persistence**: Save/load trained models to/from disk
+- [ ] **Model Versioning**: Track model versions and performance
+- [ ] **A/B Testing**: Framework for testing different model versions
+- [ ] **Model Validation**: Accuracy validation and drift detection
+- [ ] **Feature Engineering**: Advanced feature extraction pipeline
 
-### 2. **Monitoring & Observability** ❌ **BASIC**
-- [ ] Add structured logging with correlation IDs
-- [ ] Add metrics collection (authorization rates, response times, model performance)
-- [ ] Set up alerting for model failures and routing errors
-- [ ] Add distributed tracing for fine-tuned model calls
-- [ ] Monitor fine-tuned model performance and accuracy
+### 2. **Production ML Manager** ❌ **MISSING**
+- [ ] **IMLModelManager**: Implement production-grade ML model manager
+- [ ] **Online Learning**: Real-time model updates from feedback
+- [ ] **Model Deployment**: Automated model deployment pipeline
+- [ ] **Model Rollback**: Rollback to previous model versions
+- [ ] **Performance Metrics**: Model accuracy and confidence tracking
 
-### 3. **Caching Layer** ❌ **MISSING**
-- [ ] Implement Redis caching for model responses
-- [ ] Cache merchant preferences and routing patterns
-- [ ] Implement cache invalidation strategies
-- [ ] Cache training data for model updates
-
-### 4. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
-- [ ] Add rate limiting for API endpoints
-- [ ] Implement circuit breakers for OpenAI API calls
-- [ ] Add retry policies with exponential backoff
-- [ ] Implement fallback routing when model is unavailable
-
-### 5. **Security Enhancements** ⚠️ **BASIC**
-- [ ] Add API authentication/authorization
-- [ ] Implement request/response encryption
-- [ ] Add input validation and sanitization
-- [ ] Implement audit logging for compliance
-- [ ] Secure OpenAI API key management
+### 3. **Data Quality & Validation** ❌ **MISSING**
+- [ ] **Training Data Validation**: Quality checks for historical data
+- [ ] **Model Accuracy Tests**: Validation against known outcomes
+- [ ] **Schema Validation**: RouteDecision schema validation
+- [ ] **Edge Case Testing**: Test with extreme values and scenarios
 
 ---
 
-## 🧪 **Phase 3: Testing & Quality**
+## 🧪 **Phase 3: Testing & Quality Assurance**
 
-### 1. **Integration Tests** ⚠️ **PARTIAL**
-**File:** `PspRouter.Tests/IntegrationTests.cs`
-
-**Current:** Uses simplified architecture with DummyChatClient
+### 1. **Enhanced Integration Tests** ⚠️ **PARTIAL**
+**Current:** Basic integration test with mock prediction service
 
 **Enhance with:**
-- [ ] Fine-tuned model integration tests
-- [ ] End-to-end routing flow tests with real model
-- [ ] Training data validation tests
+- [ ] **Real ML Model Tests**: Integration with actual trained models
+- [ ] **End-to-End Tests**: Complete routing flow with real database
+- [ ] **Performance Tests**: Load testing for concurrent requests
+- [ ] **Model Accuracy Tests**: Validate ML predictions against historical data
+- [ ] **Feedback Loop Tests**: Test real-time learning and model updates
 
 ### 2. **Performance Testing** ❌ **MISSING**
-- [ ] Load testing for routing decisions
-- [ ] Stress testing for concurrent requests
-- [ ] Memory usage profiling
-- [ ] Model response time testing
+- [ ] **Load Testing**: Multiple concurrent routing requests
+- [ ] **Memory Profiling**: ML model memory usage optimization
+- [ ] **Response Time Testing**: Model prediction latency optimization
+- [ ] **Database Performance**: Query optimization for large datasets
 
 ### 3. **Data Quality Tests** ❌ **MISSING**
-- [ ] Training data validation tests
-- [ ] Model accuracy validation tests
-- [ ] RouteDecision schema validation tests
-- [ ] Historical data quality checks
-- [ ] Scoring with edge weights (values `PspRouter:Routing:Weights` in `PspRouter.API/appsettings.json`)
- 
+- [ ] **Training Data Quality**: Validate PaymentTransactions data
+- [ ] **Model Performance**: Accuracy metrics and validation
+- [ ] **Historical Data Checks**: Data consistency and completeness
+- [ ] **Edge Case Testing**: Unusual transaction scenarios
+
 ---
 
-## 🔄 **Phase 4: Deployment & Operations**
+## 🔄 **Phase 4: Production Operations**
+
+### 1. **Caching & Performance** ❌ **MISSING**
+- [ ] **Redis Caching**: Cache model responses and PSP data
+- [ ] **Model Caching**: Cache trained models in memory
+- [ ] **Database Query Caching**: Cache frequent database queries
+- [ ] **Cache Invalidation**: Smart cache invalidation strategies
+
+### 2. **Rate Limiting & Circuit Breakers** ❌ **MISSING**
+- [ ] **API Rate Limiting**: Protect against abuse
+- [ ] **Circuit Breakers**: Handle ML model failures gracefully
+- [ ] **Retry Policies**: Exponential backoff for failed requests
+- [ ] **Fallback Routing**: Deterministic routing when ML fails
+
+### 3. **Security & Compliance** ⚠️ **BASIC**
+- [ ] **API Authentication**: Secure API endpoints
+- [ ] **Input Validation**: Sanitize and validate all inputs
+- [ ] **Audit Logging**: Compliance and security audit trails
+- [ ] **Data Encryption**: Encrypt sensitive transaction data
+
+---
+
+## 📦 **Phase 5: Deployment & Distribution**
 
 ### 1. **Containerization** ❌ **MISSING**
-- [ ] Create Dockerfile for API
-- [ ] Add health checks to containers
-- [ ] Configure multi-stage builds
-- [ ] Add training service containerization
+- [ ] **Dockerfile**: Containerize API and services
+- [ ] **Health Checks**: Container health monitoring
+- [ ] **Multi-stage Builds**: Optimize container size
+- [ ] **Model Storage**: Container-friendly model storage
 
 ### 2. **CI/CD Pipeline** ❌ **MISSING**
-- [ ] Set up automated testing pipeline
-- [ ] Add code quality checks (SonarQube)
-- [ ] Implement automated deployment
-- [ ] Add rollback capabilities
-- [ ] Automated model training pipeline
+- [ ] **Automated Testing**: Run tests on every commit
+- [ ] **Model Training Pipeline**: Automated model retraining
+- [ ] **Deployment Automation**: Automated deployment to production
+- [ ] **Rollback Capabilities**: Quick rollback for failed deployments
 
 ### 3. **Configuration Management** ⚠️ **BASIC**
-- [ ] Implement configuration validation
-- [ ] Add environment-specific configs
-- [ ] Implement feature flags
-- [ ] Add configuration hot-reloading
-- [ ] Secure .env file management
+- [ ] **Environment Configs**: Different configs for dev/staging/prod
+- [ ] **Feature Flags**: Toggle ML features without deployment
+- [ ] **Configuration Validation**: Validate configs at startup
+- [ ] **Hot Reloading**: Update configs without restart
 
 ---
 
-## 📈 **Phase 5: Advanced Features**
+## 📈 **Phase 6: Advanced Features**
 
-### 1. **Machine Learning Enhancements** ❌ **BASIC**
-- [ ] Implement A/B testing framework for model versions
-- [ ] Add model performance monitoring and drift detection
-- [ ] Implement continuous learning from new transaction data
-- [ ] Add feature engineering pipeline for training data
+### 1. **Analytics & Reporting** ❌ **MISSING**
+- [ ] **Routing Analytics**: Decision patterns and trends
+- [ ] **Model Performance Dashboards**: Real-time model metrics
+- [ ] **Cost Optimization**: Fee reduction tracking
+- [ ] **Merchant Reports**: PSP performance by merchant
 
-### 2. **Analytics & Reporting** ❌ **MISSING**
-- [ ] Implement routing decision analytics
-- [ ] Add model performance dashboards
-- [ ] Create merchant-specific reports
-- [ ] Implement cost optimization insights
-- [ ] Model accuracy and confidence metrics
+### 2. **Multi-Region Support** ❌ **MISSING**
+- [ ] **Geographic Routing**: Region-specific PSP selection
+- [ ] **Regional Models**: Train models per region
+- [ ] **Data Residency**: Comply with regional data requirements
+- [ ] **Cross-Region Deployment**: Deploy models across regions
 
-### 3. **Multi-Region Support** ❌ **MISSING**
-- [ ] Implement geographic routing
-- [ ] Add region-specific model training
-- [ ] Implement data residency compliance
-- [ ] Add cross-region model deployment
+### 3. **Advanced ML Features** ❌ **MISSING**
+- [ ] **Ensemble Models**: Combine multiple ML approaches
+- [ ] **Deep Learning**: Neural networks for complex patterns
+- [ ] **Time Series Analysis**: Temporal pattern recognition
+- [ ] **Anomaly Detection**: Detect unusual transaction patterns
 
 ---
 
-## 📝 **Implementation Notes**
+## 🎯 **Implementation Priority Matrix**
 
-### **Priority Levels:**
-- 🚨 **CRITICAL**: Required for basic functionality
-- ⚠️ **HIGH**: Required for production use
-- ❌ **MEDIUM**: Important for scalability
-- 📈 **LOW**: Nice-to-have features
+### **🚨 CRITICAL (Week 1)**
+1. Fix code-level TODOs (unreachable code, missing implementations)
+2. Environment configuration and database setup
+3. Production logging and basic monitoring
 
-### **Dependencies:**
-- Phase 1 must be completed before Phase 2
-- Phase 2 must be completed before Phase 3
-- Phases 4-5 can be implemented in parallel
+### **⚠️ HIGH (Week 2-3)**
+1. Model persistence and versioning
+2. Enhanced integration tests with real models
+3. Performance testing and optimization
 
-### **Testing Strategy:**
-- Unit tests for fine-tuned model integration
-- Integration tests with real model responses
-- End-to-end tests for complete routing flow
-- Performance tests for production readiness
-- Model accuracy and validation tests
+### **❌ MEDIUM (Week 4-6)**
+1. Production ML manager implementation
+2. Caching and rate limiting
+3. Security enhancements
+
+### **📈 LOW (Week 7+)**
+1. Advanced analytics and reporting
+2. Multi-region support
+3. Advanced ML features
 
 ---
 
 ## 🔗 **Useful Resources**
 
+### **ML.NET Documentation:**
+- [ML.NET Guide](https://docs.microsoft.com/en-us/dotnet/machine-learning/)
+- [LightGBM in ML.NET](https://docs.microsoft.com/en-us/dotnet/machine-learning/how-to-guides/train-lightgbm-model-ml-net)
+
 ### **PSP API Documentation:**
 - [Adyen API](https://docs.adyen.com/api-explorer/)
 - [Stripe API](https://stripe.com/docs/api)
 - [PayPal API](https://developer.paypal.com/docs/api/)
-- [Klarna API](https://developers.klarna.com/api/)
 
-### **Technical References:**
- 
-- [OpenAI API Documentation](https://platform.openai.com/docs)
-- [ASP.NET Core Best Practices](https://docs.microsoft.com/en-us/aspnet/core/)
+### **Production Best Practices:**
+- [ASP.NET Core Production](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/)
+- [ML.NET Production](https://docs.microsoft.com/en-us/dotnet/machine-learning/how-to-guides/serve-model-web-api-ml-net)
 
 ---
 
-**Last Updated:** December 2024
-**Status:** ✅ Architecture simplified, ready for fine-tuning and training
-**Estimated Total Effort:** 2-3 weeks for training and deployment, 4-6 weeks for full production system
+## 📊 **Success Metrics**
+
+### **Technical Metrics:**
+- [ ] P95 latency < 200ms for routing decisions
+- [ ] 99.9% uptime for routing service
+- [ ] ML model accuracy > 85% for PSP selection
+- [ ] Zero data loss in feedback processing
+
+### **Business Metrics:**
+- [ ] 10%+ improvement in authorization rates
+- [ ] 15%+ reduction in processing fees
+- [ ] 20%+ faster transaction processing
+- [ ] 95%+ merchant satisfaction with routing
 
 ---
 
-## 🛠 **Implementation Tasks & Guidance**
-
-### **🔄 ML-Based Setup**
-- [ ] ✅ **COMPLETED**: Architecture simplified (removed all external providers)
-- [ ] Set up OpenAI API key and fine-tuned model configuration
-- [ ] Prepare training data from `PaymentTransactions` table
-- [ ] Run training workflow using `PspRouter.Trainer` project
-- [ ] Deploy fine-tuned model to production
-
-### **🔧 System Tuning & Configuration**
-- [ ] Configure fine-tuned model name in `OpenAIChatClient` (set via `OPENAI_FT_MODEL`)
-- [ ] Tune model temperature and response format for optimal routing decisions
-- [ ] Configure logging levels for production vs development environments
-- [ ] Set up database connection for training data access
-
-### **📊 Monitoring & Observability Setup**
-
-#### **Logging Configuration**
-- [ ] **Information**: Routing decisions, learning updates
-- [ ] **Warning**: Fallback scenarios, degraded performance
-- [ ] **Error**: LLM failures, database issues, parsing errors
-- [ ] **Debug**: Detailed decision reasoning, memory operations
-
-#### **Key Metrics to Track**
-- [ ] **Model Accuracy**: Routing decision correctness
-- [ ] **Average Processing Time**: Model response time optimization
-- [ ] **Cost Optimization**: Fee reduction over time
-- [ ] **Model Performance**: Success rates and confidence scores
-
-#### **Monitoring Setup**
-- [ ] Set up Application Insights or Prometheus integration
-- [ ] Configure alerting for model failures and routing errors
-- [ ] Implement health check endpoints for the routing service
-- [ ] Set up performance dashboards for model metrics
-
-### **📦 Packaging & Distribution**
-
-#### **Creating NuGet Package**
-- [ ] Build the library in Release mode
-  ```bash
-  dotnet build PspRouter.Lib --configuration Release
-  ```
-- [ ] Create NuGet package
-  ```bash
-  dotnet pack PspRouter.Lib --configuration Release
-  ```
-- [ ] Package will be created in: `PspRouter.Lib/bin/Release/PspRouter.Lib.1.0.0.nupkg`
-
-#### **Library Integration Examples**
-- [ ] **ASP.NET Core Web API Integration**
-  ```csharp
-  services.AddScoped<PspRouter.Lib.PspRouter>();
-  services.AddSingleton<IChatClient, OpenAIChatClient>();
-  ```
-- [ ] **Azure Functions Integration**
-- [ ] **Console Application Integration**
-
-#### **Library Dependencies**
-The library has minimal external dependencies:
-- `Microsoft.Extensions.Logging.Abstractions` - Logging interfaces
-- Direct HTTP calls to OpenAI API (no external SDK)
-
-### **🔧 Customization & Extensions**
-
- 
-#### **Adding New PSPs**
-- [ ] Add new PSP data to training dataset
-- [ ] Retrain fine-tuned model with expanded data
-- [ ] Client surfaces PSPs in real time from `PaymentTransactions` (no static candidate lists)
+**Last Updated:** December 2024  
+**Status:** ✅ Core ML system working, ready for production hardening  
+**Estimated Effort:** 2-3 weeks for production readiness, 6-8 weeks for full feature set
