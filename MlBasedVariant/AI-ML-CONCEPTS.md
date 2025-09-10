@@ -9,30 +9,12 @@ This document explains the key AI/ML concepts used in the PSP Router in programm
 ### **What is ML.NET?**
 ML.NET is Microsoft's open-source machine learning framework for .NET developers. It allows us to build, train, and deploy ML models directly in our C# application without external dependencies. In our PSP Router, we use ML.NET to create three specialized models that predict different aspects of PSP performance.
 
-### **How It Works**
-```
-Historical Transaction Data → Feature Engineering → Model Training → Real-time Predictions
-PaymentTransactions table → PspPerformanceFeatures → LightGBM Models → PSP Performance Scores
-```
-
 ### **Why ML.NET is Perfect for PSP Routing**
 - **No External Dependencies**: Everything runs in-process with our .NET application
 - **High Performance**: Optimized for production workloads with fast inference
 - **Type Safety**: Strongly-typed C# code with IntelliSense support
 - **Easy Deployment**: Models are just files that can be versioned and deployed
 - **Real-time Learning**: Models can be retrained with new data without downtime
-
-### **In PSP Router**
-```csharp
-// ML.NET context for all ML operations
-var mlContext = new MLContext(seed: 42);
-
-// Load trained model from disk
-var model = mlContext.Model.Load(modelPath, out var schema);
-
-// Make real-time predictions
-var prediction = model.Transform(inputData);
-```
 
 ---
 
@@ -241,9 +223,44 @@ RouteInput → RouteDecision → PSP Response → TransactionFeedback → Retrai
 ```
 
 ### **How Real-time Learning Works**
-1. **Transaction Processing**: Route transaction using main ML models
-2. **Feedback Recieving**: Recive notification upon end of transaction, (success/failure, processing time), to update internal data about PSP performance, the feedbacks stored at in-memory cache (last 1000 transactions per PSP)
-4. **Model Update**: Retrain the 3 auxliraty models with fresh data, from monolith's DB, while one of retraining triggers occured TODO
+
+#### **Two Types of Models Working Together**
+
+**1. Main Model (Trained Once)**
+- **Purpose**: One intelligent model trained on huge amounts of historical payment transactions
+- **Characteristics**: Very clever and sophisticated, but unaware of real-time feedbacks and changes
+- **Training**: Trained once on massive historical dataset from PaymentTransactions table
+- **Usage**: Provides baseline intelligent routing decisions
+
+**2. Three Auxiliary Models (Real-time Learning)**
+- **Success Rate Model**: Predicts authorization probability based on recent performance
+- **Processing Time Model**: Predicts transaction processing time based on recent data  
+- **Health Status Model**: Predicts PSP health classification (green/yellow/red)
+- **Characteristics**: Continuously updated with real-time feedback and retrained with fresh data
+- **Training**: Retrained periodically using fresh data from monolith's database
+
+#### **PSP Candidates Collection and Usage**
+
+**How PSP Candidates are Built:**
+- **Database Query**: Load PSP performance data from PaymentTransactions table
+- **Historical Metrics**: Calculate 30-day authorization rates, average processing times, health status
+- **Real-time Updates**: Update candidate performance metrics with incoming feedback
+- **In-Memory Cache**: Store last 1000 transactions per PSP for immediate updates
+
+**How Candidates are Used:**
+- **Guardrails**: Filter candidates by support status, health (green/yellow only), SCA compliance
+- **ML Predictions**: Apply auxiliary models to predict success rate, processing time, health
+- **Combined Scoring**: Merge main model intelligence with auxiliary model predictions
+- **Final Selection**: Choose best PSP based on combined insights
+
+#### **Combination of Candidates, Feedbacks, and 3 Models**
+
+**Real-time Learning Flow:**
+1. **Transaction Processing**: Route using main model + auxiliary model predictions
+2. **Feedback Receiving**: Receive transaction outcome (success/failure, processing time)
+3. **Cache Update**: Store feedback in in-memory cache (last 1000 transactions per PSP)
+4. **Auxiliary Model Retraining**: Retrain 3 auxiliary models with fresh data from database when triggers occur
+5. **Continuous Improvement**: System gets smarter with each transaction
 
 
 ### **Cached Feedback System**
