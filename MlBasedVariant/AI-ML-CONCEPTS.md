@@ -241,87 +241,21 @@ RouteInput → RouteDecision → PSP Response → TransactionFeedback → Retrai
 ```
 
 ### **How Real-time Learning Works**
-1. **Transaction Processing**: Route transaction using current ML models
-2. **Feedback Collection**: Collect actual PSP performance (success/failure, processing time)
-3. **Cached Feedback Storage**: Store feedback in in-memory cache (last 1000 transactions per PSP)
-4. **Real-time Cache Updates**: Update cached performance metrics immediately
-5. **Model Update**: Retrain models with accumulated cached feedback data
-6. **Model Deployment**: Replace old models with improved versions
+1. **Transaction Processing**: Route transaction using main ML models
+2. **Feedback Recieving**: Recive notification upon end of transaction, (success/failure, processing time), to update internal data about PSP performance, the feedbacks stored at in-memory cache (last 1000 transactions per PSP)
+4. **Model Update**: Retrain the 3 auxliraty models with fresh data, from monolith's DB, while one of retraining triggers occured TODO
 
-### **Retraining Triggers**
-```csharp
-public bool ShouldRetrainModels()
-{
-    return _lastRetraining == DateTime.MinValue ||           // Never retrained
-           DateTime.UtcNow - _lastRetraining > TimeSpan.FromHours(24) || // 24 hours elapsed
-           _performancePredictor.ShouldRetrain();            // Performance degraded
-}
-```
 
 ### **Cached Feedback System**
-```csharp
-// Store feedback in in-memory cache
-public void UpdateWithFeedback(TransactionFeedback feedback)
-{
-    lock (_lock)
-    {
-        _recentFeedback.Add(feedback);
-        
-        // Keep only recent feedback (last 1000 transactions)
-        if (_recentFeedback.Count > 1000)
-        {
-            _recentFeedback.RemoveAt(0);
-        }
-        
-        // Update cached values immediately
-        UpdateCachedValues();
-    }
-}
-
-// Real-time cache updates
-private void UpdateCachedValues()
-{
-    if (_recentFeedback.Count == 0) return;
-    
-    // Calculate success rate from cached feedback
-    var successful = _recentFeedback.Count(f => f.Authorized);
-    _cachedSuccessRate = (double)successful / _recentFeedback.Count;
-    
-    // Calculate average processing time from cached feedback
-    _cachedProcessingTime = (int)_recentFeedback.Average(f => f.ProcessingTimeMs);
-    
-    // Determine health status from cached metrics
-    if (_cachedSuccessRate >= 0.9 && _cachedProcessingTime <= 2000)
-        _cachedHealthStatus = "green";
-    else if (_cachedSuccessRate >= 0.8 && _cachedProcessingTime <= 3000)
-        _cachedHealthStatus = "yellow";
-    else
-        _cachedHealthStatus = "red";
-}
-```
+TODO: Explain verbaly
 
 ### **Incremental Learning**
-```csharp
-// Update models with new feedback
-await _performancePredictor.UpdateWithFeedback(feedback);
-
-// Trigger retraining if needed
-if (_retrainingService.ShouldRetrainModels())
-{
-    await _retrainingService.RetrainPspModelAsync(pspName);
-}
-```
+TODO: Explain verbaly
 
 ### **Guardrails System**
 
 #### **Guardrail Logic**
-```csharp
-var valid = ctx.Candidates
-    .Where(c => c.Supports)                    // PSP must be marked as supported
-    .Where(c => c.Health is "green" or "yellow") // Only healthy PSPs
-    .Where(c => !(ctx.Tx.SCARequired && ctx.Tx.PaymentMethodId == 1 && !c.Supports3DS)) // SCA compliance
-    .ToList();
-```
+TODO: Explain verbaly
 
 #### **Guardrail Types**
 1. **Supports Flag**: Boolean indicator that PSP is available for routing
@@ -334,42 +268,6 @@ var valid = ctx.Candidates
 - **Reliability**: Filters out problematic PSPs before AI decision
 - **Performance**: Reduces decision complexity by pre-filtering candidates
 
-### **What the ML-Based Receives**
-
-```json
-{
-  "Transaction": {
-    "MerchantId": "M123",
-    "Amount": 150.00,
-    "CurrencyId": 1, 
-    "PaymentMethodId": 1,
-    "PaymentCardBin": "411111",
-    "ThreeDSTypeId": null,
-    "IsTokenized": false,
-    "SCARequired": false,
-    "RiskScore": 18
-  },
-  "Candidates": [
-    {
-      "Name": "Adyen",
-      "Health": "green",
-      "AuthRate30d": 0.89,
-      "FeeBps": 200,
-      "Supports3DS": true
-    }
-  ],
-  "Weights": {
-    "AuthWeight": 1.2,
-    "FeeBpsWeight": 0.8,
-    "FixedFeeWeight": 0.5,
-    "Supports3DSBonusWhenSCARequired": 0.0,
-    "RiskScorePenaltyPerPoint": 0.0,
-    "HealthYellowPenalty": 0.0,
-    "BusinessBiasWeight": 0.1,
-    "BusinessBias": { "Adyen": 0.02, "Stripe": -0.01 },
-  }
-}
-```
 
 ### **ML-Based's Decision Process**
 
