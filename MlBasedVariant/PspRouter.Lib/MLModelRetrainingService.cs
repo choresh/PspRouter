@@ -206,14 +206,14 @@ public class MLModelRetrainingService : IMLModelRetrainingService
             while (await reader.ReadAsync(cancellationToken))
             {
                 var feedback = new TransactionFeedback(
-                    DecisionId: reader.GetString(0),
+                    DecisionId: reader.GetInt64(0).ToString(),  // Convert Int64 to String
                     MerchantId: reader.GetString(1),
                     PspName: reader.GetString(2),
-                    Authorized: reader.GetInt32(3) == 1,
+                    Authorized: Convert.ToInt32(reader.GetValue(3)) == 1,  // Use flexible conversion
                     TransactionAmount: reader.GetDecimal(4),
                     FeeAmount: reader.GetDecimal(5),
-                    ProcessingTimeMs: reader.GetInt32(6),
-                    RiskScore: reader.GetInt32(7),
+                    ProcessingTimeMs: Convert.ToInt32(reader.GetValue(6)),  // Use flexible conversion
+                    RiskScore: Convert.ToInt32(reader.GetValue(7)),  // Use flexible conversion
                     ProcessedAt: reader.GetDateTime(8),
                     ErrorCode: reader.IsDBNull(9) ? null : reader.GetString(9),
                     ErrorMessage: reader.IsDBNull(10) ? null : reader.GetString(10),
@@ -257,7 +257,7 @@ public class MLModelRetrainingService : IMLModelRetrainingService
             var query = @"
                 SELECT TOP 500
                     pt.PaymentTransactionId as DecisionId,
-                    pt.MerchantId,
+                    CAST(pt.PaymentGatewayId AS NVARCHAR(50)) as MerchantId,  -- Use PaymentGatewayId as MerchantId for now
                     CAST(pt.PaymentGatewayId AS NVARCHAR(50)) as PspName,
                     CASE WHEN pt.PaymentTransactionStatusId IN (5, 7, 9) THEN 1 ELSE 0 END as Authorized,
                     pt.Amount as TransactionAmount,
@@ -289,14 +289,14 @@ public class MLModelRetrainingService : IMLModelRetrainingService
             while (await reader.ReadAsync(cancellationToken))
             {
                 var feedback = new TransactionFeedback(
-                    DecisionId: reader.GetString(0),
+                    DecisionId: reader.GetInt64(0).ToString(),  // Convert Int64 to String
                     MerchantId: reader.GetString(1),
                     PspName: reader.GetString(2),
-                    Authorized: reader.GetInt32(3) == 1,
+                    Authorized: Convert.ToInt32(reader.GetValue(3)) == 1,  // Use flexible conversion
                     TransactionAmount: reader.GetDecimal(4),
                     FeeAmount: reader.GetDecimal(5),
-                    ProcessingTimeMs: reader.GetInt32(6),
-                    RiskScore: reader.GetInt32(7),
+                    ProcessingTimeMs: Convert.ToInt32(reader.GetValue(6)),  // Use flexible conversion
+                    RiskScore: Convert.ToInt32(reader.GetValue(7)),  // Use flexible conversion
                     ProcessedAt: reader.GetDateTime(8),
                     ErrorCode: reader.IsDBNull(9) ? null : reader.GetString(9),
                     ErrorMessage: reader.IsDBNull(10) ? null : reader.GetString(10),
